@@ -177,3 +177,34 @@ func TestGetDeploymentNames(t *testing.T) {
 		})
 	}
 }
+
+func TestVLLMSpecDeepCopy(t *testing.T) {
+	g := NewGomegaWithT(t)
+	enforceEager := true
+	original := &PredictiveUnit{
+		Name: "llm-adapter",
+		VLLM: &VLLMSpec{
+			ServedModelName: "qwen-0.5b",
+			ModelSource: &VLLMModelSource{
+				HostPath: &VLLMHostPathSource{Path: "/models/qwen"},
+			},
+			GPU: &VLLMGPUSpec{
+				ResourceName: "nvidia.com/gpu",
+				Count:        1,
+			},
+			Engine: &VLLMEngineSpec{
+				Port:         8081,
+				EnforceEager: &enforceEager,
+			},
+		},
+	}
+
+	copied := original.DeepCopy()
+	copied.VLLM.ModelSource.HostPath.Path = "/models/other"
+	copied.VLLM.GPU.Count = 2
+	*copied.VLLM.Engine.EnforceEager = false
+
+	g.Expect(original.VLLM.ModelSource.HostPath.Path).To(Equal("/models/qwen"))
+	g.Expect(original.VLLM.GPU.Count).To(Equal(int32(1)))
+	g.Expect(*original.VLLM.Engine.EnforceEager).To(BeTrue())
+}

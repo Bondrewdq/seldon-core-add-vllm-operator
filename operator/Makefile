@@ -60,7 +60,7 @@ install-cert-manager:
 	kubectl rollout status deployment.apps/cert-manager-webhook -n cert-manager
 
 
-manifests_all: manifests manifests_v1_small
+manifests_all: manifests manifests_v1_small graph-schema
 
 # Install CRDs into a cluster
 # Note use of create to stop too long annotation being created. See https://github.com/kubernetes-sigs/kubebuilder/issues/1140
@@ -144,6 +144,26 @@ vet:
 # Generate code
 generate: controller-gen
 	$(CONTROLLER_GEN) object:headerFile=./hack/boilerplate.go.txt paths="./apis/machinelearning.seldon.io/..."
+
+# Run the v1.16 code generators with their original Go toolchain when the host
+# Go version is too new for controller-gen v0.9.2.
+.PHONY: generate-in-docker
+generate-in-docker:
+	docker run --rm \
+		--user "$(shell id -u):$(shell id -g)" \
+		-e GO111MODULE=on \
+		-e GOPATH=/tmp/go \
+		-e GOBIN=/tmp/go/bin \
+		-e GOCACHE=/tmp/go-cache \
+		-e HTTP_PROXY -e HTTPS_PROXY -e http_proxy -e https_proxy \
+		-v "$(PROJECT_DIR):/workspace" \
+		-w /workspace \
+		golang:1.17.7-buster \
+		bash -ec 'go install sigs.k8s.io/controller-tools/cmd/controller-gen@v0.9.2; \
+			/tmp/go/bin/controller-gen object:headerFile=./hack/boilerplate.go.txt paths="./apis/machinelearning.seldon.io/..."; \
+			/tmp/go/bin/controller-gen rbac:roleName=manager-role webhook paths="./apis/machinelearning.seldon.io/..." output:crd:artifacts:config=config/crd/bases crd:crdVersions=v1; \
+			/tmp/go/bin/controller-gen rbac:roleName=manager-role paths="./apis/machinelearning.seldon.io/v1" output:crd:artifacts:config=config/crd_v1_small/bases crd:crdVersions=v1'
+	$(MAKE) graph-schema
 
 # Generate Clientset
 create-client: test
@@ -263,8 +283,10 @@ generate-resources:
 	kustomize build config/default/ -o generated
 	cp generated/apiextensions.k8s.io_v1_customresourcedefinition_seldondeployments.machinelearning.seldon.io.yaml testing/machinelearning.seldon.io_seldondeployments.yaml
 
-config/crd/patches/graph_children.yaml:
-	python hack/create_graph_openapi_schema.py hack/graph_patch.tmpl.yaml config/crd/patches/graph_children.yaml
+.PHONY: graph-schema
+graph-schema:
+	python3 hack/create_graph_openapi_schema.py hack/graph_patch.tmpl.yaml config/crd/patches/graph_children.yaml --versions 3
+	python3 hack/create_graph_openapi_schema.py hack/graph_patch.tmpl.yaml config/crd_v1_small/patches/graph_children.yaml --versions 1
 
 
 ###################################

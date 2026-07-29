@@ -596,6 +596,56 @@ type Parameter struct {
 	Type  ParmeterType `json:"type" protobuf:"int,3,opt,name=type"`
 }
 
+// VLLMSpec defines the typed runtime configuration for a VLLM_SERVER node.
+type VLLMSpec struct {
+	// ServedModelName is the model name exposed by the vLLM OpenAI-compatible API.
+	// +kubebuilder:validation:MinLength=1
+	ServedModelName string `json:"servedModelName" protobuf:"string,1,opt,name=servedModelName"`
+	// Image is the vLLM backend container image.
+	// +kubebuilder:validation:MinLength=1
+	Image string `json:"image,omitempty" protobuf:"string,2,opt,name=image"`
+	// RuntimeClassName selects the Kubernetes runtime used by the generated Pod.
+	// +kubebuilder:validation:MinLength=1
+	RuntimeClassName string           `json:"runtimeClassName,omitempty" protobuf:"string,3,opt,name=runtimeClassName"`
+	ModelSource      *VLLMModelSource `json:"modelSource,omitempty" protobuf:"bytes,4,opt,name=modelSource"`
+	GPU              *VLLMGPUSpec     `json:"gpu,omitempty" protobuf:"bytes,5,opt,name=gpu"`
+	Engine           *VLLMEngineSpec  `json:"engine,omitempty" protobuf:"bytes,6,opt,name=engine"`
+}
+
+// VLLMModelSource describes where the vLLM backend reads model files from.
+type VLLMModelSource struct {
+	HostPath *VLLMHostPathSource `json:"hostPath,omitempty" protobuf:"bytes,1,opt,name=hostPath"`
+}
+
+// VLLMHostPathSource mounts a model directory from the Kubernetes node.
+type VLLMHostPathSource struct {
+	// +kubebuilder:validation:MinLength=1
+	Path string `json:"path" protobuf:"string,1,opt,name=path"`
+}
+
+// VLLMGPUSpec defines the extended GPU resource requested by the vLLM backend.
+type VLLMGPUSpec struct {
+	// +kubebuilder:validation:MinLength=1
+	ResourceName string `json:"resourceName,omitempty" protobuf:"string,1,opt,name=resourceName"`
+	// +kubebuilder:validation:Minimum=1
+	Count int32 `json:"count,omitempty" protobuf:"int32,2,opt,name=count"`
+}
+
+// VLLMEngineSpec defines stable vLLM engine settings managed by the Operator.
+type VLLMEngineSpec struct {
+	// +kubebuilder:validation:Minimum=1
+	// +kubebuilder:validation:Maximum=65535
+	Port int32 `json:"port,omitempty" protobuf:"int32,1,opt,name=port"`
+	// +kubebuilder:validation:Minimum=1
+	MaxModelLen int32 `json:"maxModelLen,omitempty" protobuf:"int32,2,opt,name=maxModelLen"`
+	// +kubebuilder:validation:Minimum=1
+	MaxNumSeqs int32 `json:"maxNumSeqs,omitempty" protobuf:"int32,3,opt,name=maxNumSeqs"`
+	// +kubebuilder:validation:Minimum=1
+	// +kubebuilder:validation:Maximum=100
+	GPUMemoryUtilizationPercent int32 `json:"gpuMemoryUtilizationPercent,omitempty" protobuf:"int32,4,opt,name=gpuMemoryUtilizationPercent"`
+	EnforceEager                *bool `json:"enforceEager,omitempty" protobuf:"varint,5,opt,name=enforceEager"`
+}
+
 type PredictiveUnit struct {
 	Name                    string                        `json:"name" protobuf:"string,1,opt,name=name"`
 	Children                []PredictiveUnit              `json:"children,omitempty" protobuf:"bytes,2,opt,name=children"`
@@ -609,6 +659,7 @@ type PredictiveUnit struct {
 	EnvSecretRefName        string                        `json:"envSecretRefName,omitempty" protobuf:"bytes,10,opt,name=envSecretRefName"`
 	StorageInitializerImage string                        `json:"storageInitializerImage,omitempty" protobuf:"bytes,11,opt,name=storageInitializerImage"`
 	Logger                  *Logger                       `json:"logger,omitempty" protobuf:"bytes,12,opt,name=logger"`
+	VLLM                    *VLLMSpec                     `json:"vllm,omitempty" protobuf:"bytes,13,opt,name=vllm"`
 }
 
 type LoggerMode string

@@ -10825,6 +10825,79 @@ spec:
                           type: string
                         type:
                           type: string
+                        vllm:
+                          description: VLLMSpec defines the typed runtime configuration
+                            for a VLLM_SERVER node.
+                          properties:
+                            engine:
+                              description: VLLMEngineSpec defines stable vLLM engine
+                                settings managed by the Operator.
+                              properties:
+                                enforceEager:
+                                  type: boolean
+                                gpuMemoryUtilizationPercent:
+                                  format: int32
+                                  maximum: 100
+                                  minimum: 1
+                                  type: integer
+                                maxModelLen:
+                                  format: int32
+                                  minimum: 1
+                                  type: integer
+                                maxNumSeqs:
+                                  format: int32
+                                  minimum: 1
+                                  type: integer
+                                port:
+                                  format: int32
+                                  maximum: 65535
+                                  minimum: 1
+                                  type: integer
+                              type: object
+                            gpu:
+                              description: VLLMGPUSpec defines the extended GPU resource
+                                requested by the vLLM backend.
+                              properties:
+                                count:
+                                  format: int32
+                                  minimum: 1
+                                  type: integer
+                                resourceName:
+                                  minLength: 1
+                                  type: string
+                              type: object
+                            image:
+                              description: Image is the vLLM backend container image.
+                              minLength: 1
+                              type: string
+                            modelSource:
+                              description: VLLMModelSource describes where the vLLM
+                                backend reads model files from.
+                              properties:
+                                hostPath:
+                                  description: VLLMHostPathSource mounts a model directory
+                                    from the Kubernetes node.
+                                  properties:
+                                    path:
+                                      minLength: 1
+                                      type: string
+                                  required:
+                                  - path
+                                  type: object
+                              type: object
+                            runtimeClassName:
+                              description: RuntimeClassName selects the Kubernetes
+                                runtime used by the generated Pod.
+                              minLength: 1
+                              type: string
+                            servedModelName:
+                              description: ServedModelName is the model name exposed
+                                by the vLLM OpenAI-compatible API.
+                              minLength: 1
+                              type: string
+                          required:
+                          - servedModelName
+                          type: object
                       required:
                       - name
                       type: object
@@ -21933,6 +22006,79 @@ spec:
                           type: string
                         type:
                           type: string
+                        vllm:
+                          description: VLLMSpec defines the typed runtime configuration
+                            for a VLLM_SERVER node.
+                          properties:
+                            engine:
+                              description: VLLMEngineSpec defines stable vLLM engine
+                                settings managed by the Operator.
+                              properties:
+                                enforceEager:
+                                  type: boolean
+                                gpuMemoryUtilizationPercent:
+                                  format: int32
+                                  maximum: 100
+                                  minimum: 1
+                                  type: integer
+                                maxModelLen:
+                                  format: int32
+                                  minimum: 1
+                                  type: integer
+                                maxNumSeqs:
+                                  format: int32
+                                  minimum: 1
+                                  type: integer
+                                port:
+                                  format: int32
+                                  maximum: 65535
+                                  minimum: 1
+                                  type: integer
+                              type: object
+                            gpu:
+                              description: VLLMGPUSpec defines the extended GPU resource
+                                requested by the vLLM backend.
+                              properties:
+                                count:
+                                  format: int32
+                                  minimum: 1
+                                  type: integer
+                                resourceName:
+                                  minLength: 1
+                                  type: string
+                              type: object
+                            image:
+                              description: Image is the vLLM backend container image.
+                              minLength: 1
+                              type: string
+                            modelSource:
+                              description: VLLMModelSource describes where the vLLM
+                                backend reads model files from.
+                              properties:
+                                hostPath:
+                                  description: VLLMHostPathSource mounts a model directory
+                                    from the Kubernetes node.
+                                  properties:
+                                    path:
+                                      minLength: 1
+                                      type: string
+                                  required:
+                                  - path
+                                  type: object
+                              type: object
+                            runtimeClassName:
+                              description: RuntimeClassName selects the Kubernetes
+                                runtime used by the generated Pod.
+                              minLength: 1
+                              type: string
+                            servedModelName:
+                              description: ServedModelName is the model name exposed
+                                by the vLLM OpenAI-compatible API.
+                              minLength: 1
+                              type: string
+                          required:
+                          - servedModelName
+                          type: object
                       required:
                       - name
                       type: object
@@ -33041,6 +33187,79 @@ spec:
                           type: string
                         type:
                           type: string
+                        vllm:
+                          description: VLLMSpec defines the typed runtime configuration
+                            for a VLLM_SERVER node.
+                          properties:
+                            engine:
+                              description: VLLMEngineSpec defines stable vLLM engine
+                                settings managed by the Operator.
+                              properties:
+                                enforceEager:
+                                  type: boolean
+                                gpuMemoryUtilizationPercent:
+                                  format: int32
+                                  maximum: 100
+                                  minimum: 1
+                                  type: integer
+                                maxModelLen:
+                                  format: int32
+                                  minimum: 1
+                                  type: integer
+                                maxNumSeqs:
+                                  format: int32
+                                  minimum: 1
+                                  type: integer
+                                port:
+                                  format: int32
+                                  maximum: 65535
+                                  minimum: 1
+                                  type: integer
+                              type: object
+                            gpu:
+                              description: VLLMGPUSpec defines the extended GPU resource
+                                requested by the vLLM backend.
+                              properties:
+                                count:
+                                  format: int32
+                                  minimum: 1
+                                  type: integer
+                                resourceName:
+                                  minLength: 1
+                                  type: string
+                              type: object
+                            image:
+                              description: Image is the vLLM backend container image.
+                              minLength: 1
+                              type: string
+                            modelSource:
+                              description: VLLMModelSource describes where the vLLM
+                                backend reads model files from.
+                              properties:
+                                hostPath:
+                                  description: VLLMHostPathSource mounts a model directory
+                                    from the Kubernetes node.
+                                  properties:
+                                    path:
+                                      minLength: 1
+                                      type: string
+                                  required:
+                                  - path
+                                  type: object
+                              type: object
+                            runtimeClassName:
+                              description: RuntimeClassName selects the Kubernetes
+                                runtime used by the generated Pod.
+                              minLength: 1
+                              type: string
+                            servedModelName:
+                              description: ServedModelName is the model name exposed
+                                by the vLLM OpenAI-compatible API.
+                              minLength: 1
+                              type: string
+                          required:
+                          - servedModelName
+                          type: object
                       required:
                       - name
                       type: object
