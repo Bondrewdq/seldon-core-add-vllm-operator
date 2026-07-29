@@ -1,0 +1,43 @@
+image:
+  tag: 3.3.3-3.3.1-ubuntu22.04
+
+runtimeClassName: nvidia
+
+arguments:
+  - -f
+  - /etc/dcgm-exporter/core-metrics.csv
+
+securityContext:
+  runAsNonRoot: false
+  runAsUser: 0
+  capabilities:
+    add: []
+    drop:
+      - ALL
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 64Mi
+  limits:
+    cpu: 200m
+    memory: 256Mi
+
+serviceMonitor:
+  enabled: true
+  interval: 15s
+  honorLabels: false
+
+extraConfigMapVolumes:
+  - name: core-metrics
+    configMap:
+      name: dcgm-exporter-metrics
+      items:
+        - key: core-metrics.csv
+          path: core-metrics.csv
+
+extraVolumeMounts:
+  - name: core-metrics
+    mountPath: /etc/dcgm-exporter/core-metrics.csv
+    subPath: core-metrics.csv
+    readOnly: true

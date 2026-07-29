@@ -1,0 +1,32 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: seldon-vllm
+  namespace: monitoring
+spec:
+  groups:
+    - name: seldon-vllm.availability
+      rules:
+        - alert: SeldonVLLMMetricsTargetDown
+          expr: up{runtime="vllm"} == 0
+          for: 2m
+          labels:
+            severity: warning
+          annotations:
+            summary: Seldon vLLM metrics target is unavailable
+            description: "{{ $labels.namespace }}/{{ $labels.pod }} target on {{ $labels.container }} has been down for two minutes."
+        - alert: SeldonVLLMHighRequestErrorRate
+          expr: |
+            (
+              sum by (namespace, seldon_deployment) (rate(llm_adapter_requests_total{status!~"2.."}[5m]))
+              /
+              clamp_min(sum by (namespace, seldon_deployment) (rate(llm_adapter_requests_total[5m])), 0.001)
+            ) > 0.05
+            and
+            sum by (namespace, seldon_deployment) (rate(llm_adapter_requests_total[5m])) > 0.1
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: Seldon vLLM request error rate is above 5 percent
+            description: "{{ $labels.namespace }}/{{ $labels.seldon_deployment }} has sustained request failures."
