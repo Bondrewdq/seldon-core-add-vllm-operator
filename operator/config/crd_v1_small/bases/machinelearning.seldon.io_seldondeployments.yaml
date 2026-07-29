@@ -10884,6 +10884,16 @@ spec:
                                   required:
                                   - path
                                   type: object
+                                pvc:
+                                  description: VLLMPVCSource mounts a pre-populated
+                                    PersistentVolumeClaim from the workload namespace.
+                                  properties:
+                                    claimName:
+                                      minLength: 1
+                                      type: string
+                                  required:
+                                  - claimName
+                                  type: object
                               type: object
                             runtimeClassName:
                               description: RuntimeClassName selects the Kubernetes

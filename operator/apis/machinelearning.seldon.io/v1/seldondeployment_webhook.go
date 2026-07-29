@@ -133,24 +133,56 @@ func validateVLLMSpec(pu *PredictiveUnit, fldPath *field.Path, allErrs field.Err
 			modelSourcePath,
 			"modelSource is required for typed VLLM configuration",
 		))
-	} else if pu.VLLM.ModelSource.HostPath == nil {
-		allErrs = append(allErrs, field.Required(
-			modelSourcePath.Child("hostPath"),
-			"hostPath is the only model source supported in this version",
-		))
 	} else {
-		hostPath := pu.VLLM.ModelSource.HostPath.Path
-		if strings.TrimSpace(hostPath) == "" {
+		hasHostPath := pu.VLLM.ModelSource.HostPath != nil
+		hasPVC := pu.VLLM.ModelSource.PVC != nil
+		switch {
+		case !hasHostPath && !hasPVC:
 			allErrs = append(allErrs, field.Required(
-				modelSourcePath.Child("hostPath").Child("path"),
-				"hostPath.path is required",
+				modelSourcePath,
+				"exactly one of hostPath or pvc is required",
 			))
-		} else if strings.TrimSpace(hostPath) != hostPath || !path.IsAbs(hostPath) {
+		case hasHostPath && hasPVC:
 			allErrs = append(allErrs, field.Invalid(
-				modelSourcePath.Child("hostPath").Child("path"),
-				hostPath,
-				"must be an absolute node path without surrounding whitespace",
+				modelSourcePath,
+				pu.VLLM.ModelSource,
+				"hostPath and pvc are mutually exclusive",
 			))
+		case hasHostPath:
+			hostPath := pu.VLLM.ModelSource.HostPath.Path
+			if strings.TrimSpace(hostPath) == "" {
+				allErrs = append(allErrs, field.Required(
+					modelSourcePath.Child("hostPath").Child("path"),
+					"hostPath.path is required",
+				))
+			} else if strings.TrimSpace(hostPath) != hostPath || !path.IsAbs(hostPath) {
+				allErrs = append(allErrs, field.Invalid(
+					modelSourcePath.Child("hostPath").Child("path"),
+					hostPath,
+					"must be an absolute node path without surrounding whitespace",
+				))
+			}
+		case hasPVC:
+			claimName := pu.VLLM.ModelSource.PVC.ClaimName
+			claimNamePath := modelSourcePath.Child("pvc").Child("claimName")
+			if strings.TrimSpace(claimName) == "" {
+				allErrs = append(allErrs, field.Required(
+					claimNamePath,
+					"pvc.claimName is required",
+				))
+			} else if strings.TrimSpace(claimName) != claimName {
+				allErrs = append(allErrs, field.Invalid(
+					claimNamePath,
+					claimName,
+					"must not contain surrounding whitespace",
+				))
+			} else if messages := k8svalidation.IsDNS1123Subdomain(claimName); len(messages) > 0 {
+				allErrs = append(allErrs, field.Invalid(
+					claimNamePath,
+					claimName,
+					strings.Join(messages, "; "),
+				))
+			}
 		}
 	}
 

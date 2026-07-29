@@ -145,6 +145,15 @@
                                                                             required:
                                                                             - path
                                                                             type: object
+                                                                          pvc:
+                                                                            description: VLLMPVCSource mounts a pre-populated PersistentVolumeClaim from the workload namespace.
+                                                                            properties:
+                                                                              claimName:
+                                                                                minLength: 1
+                                                                                type: string
+                                                                            required:
+                                                                            - claimName
+                                                                            type: object
                                                                         type: object
                                                                       runtimeClassName:
                                                                         description: RuntimeClassName selects the Kubernetes runtime used by the generated Pod.
@@ -273,6 +282,15 @@
                                                                           type: string
                                                                       required:
                                                                       - path
+                                                                      type: object
+                                                                    pvc:
+                                                                      description: VLLMPVCSource mounts a pre-populated PersistentVolumeClaim from the workload namespace.
+                                                                      properties:
+                                                                        claimName:
+                                                                          minLength: 1
+                                                                          type: string
+                                                                      required:
+                                                                      - claimName
                                                                       type: object
                                                                   type: object
                                                                 runtimeClassName:
@@ -403,6 +421,15 @@
                                                                 required:
                                                                 - path
                                                                 type: object
+                                                              pvc:
+                                                                description: VLLMPVCSource mounts a pre-populated PersistentVolumeClaim from the workload namespace.
+                                                                properties:
+                                                                  claimName:
+                                                                    minLength: 1
+                                                                    type: string
+                                                                required:
+                                                                - claimName
+                                                                type: object
                                                             type: object
                                                           runtimeClassName:
                                                             description: RuntimeClassName selects the Kubernetes runtime used by the generated Pod.
@@ -531,6 +558,15 @@
                                                               type: string
                                                           required:
                                                           - path
+                                                          type: object
+                                                        pvc:
+                                                          description: VLLMPVCSource mounts a pre-populated PersistentVolumeClaim from the workload namespace.
+                                                          properties:
+                                                            claimName:
+                                                              minLength: 1
+                                                              type: string
+                                                          required:
+                                                          - claimName
                                                           type: object
                                                       type: object
                                                     runtimeClassName:
@@ -661,6 +697,15 @@
                                                     required:
                                                     - path
                                                     type: object
+                                                  pvc:
+                                                    description: VLLMPVCSource mounts a pre-populated PersistentVolumeClaim from the workload namespace.
+                                                    properties:
+                                                      claimName:
+                                                        minLength: 1
+                                                        type: string
+                                                    required:
+                                                    - claimName
+                                                    type: object
                                                 type: object
                                               runtimeClassName:
                                                 description: RuntimeClassName selects the Kubernetes runtime used by the generated Pod.
@@ -789,6 +834,15 @@
                                                   type: string
                                               required:
                                               - path
+                                              type: object
+                                            pvc:
+                                              description: VLLMPVCSource mounts a pre-populated PersistentVolumeClaim from the workload namespace.
+                                              properties:
+                                                claimName:
+                                                  minLength: 1
+                                                  type: string
+                                              required:
+                                              - claimName
                                               type: object
                                           type: object
                                         runtimeClassName:
@@ -919,6 +973,15 @@
                                         required:
                                         - path
                                         type: object
+                                      pvc:
+                                        description: VLLMPVCSource mounts a pre-populated PersistentVolumeClaim from the workload namespace.
+                                        properties:
+                                          claimName:
+                                            minLength: 1
+                                            type: string
+                                        required:
+                                        - claimName
+                                        type: object
                                     type: object
                                   runtimeClassName:
                                     description: RuntimeClassName selects the Kubernetes runtime used by the generated Pod.
@@ -1047,6 +1110,15 @@
                                       type: string
                                   required:
                                   - path
+                                  type: object
+                                pvc:
+                                  description: VLLMPVCSource mounts a pre-populated PersistentVolumeClaim from the workload namespace.
+                                  properties:
+                                    claimName:
+                                      minLength: 1
+                                      type: string
+                                  required:
+                                  - claimName
                                   type: object
                               type: object
                             runtimeClassName:
@@ -1177,6 +1249,15 @@
                             required:
                             - path
                             type: object
+                          pvc:
+                            description: VLLMPVCSource mounts a pre-populated PersistentVolumeClaim from the workload namespace.
+                            properties:
+                              claimName:
+                                minLength: 1
+                                type: string
+                            required:
+                            - claimName
+                            type: object
                         type: object
                       runtimeClassName:
                         description: RuntimeClassName selects the Kubernetes runtime used by the generated Pod.
@@ -1306,6 +1387,15 @@
                       required:
                       - path
                       type: object
+                    pvc:
+                      description: VLLMPVCSource mounts a pre-populated PersistentVolumeClaim from the workload namespace.
+                      properties:
+                        claimName:
+                          minLength: 1
+                          type: string
+                      required:
+                      - claimName
+                      type: object
                   type: object
                 runtimeClassName:
                   description: RuntimeClassName selects the Kubernetes runtime used by the generated Pod.
@@ -1434,6 +1524,15 @@
                     type: string
                 required:
                 - path
+                type: object
+              pvc:
+                description: VLLMPVCSource mounts a pre-populated PersistentVolumeClaim from the workload namespace.
+                properties:
+                  claimName:
+                    minLength: 1
+                    type: string
+                required:
+                - claimName
                 type: object
             type: object
           runtimeClassName:

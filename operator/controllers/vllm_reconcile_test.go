@@ -39,6 +39,7 @@ func TestResolveVLLMConfigUsesLegacyParameters(t *testing.T) {
 		backendImage:         "example.com/vllm:legacy",
 		runtimeClassName:     "legacy-runtime",
 		modelURI:             "/models/legacy",
+		modelSourceKind:      vllmModelSourceHostPath,
 		modelHostPath:        "/node/legacy",
 		gpuResourceName:      "example.com/legacy-gpu",
 		gpuCount:             resource.MustParse("2"),
@@ -98,6 +99,7 @@ func TestResolveVLLMConfigPrefersTypedFields(t *testing.T) {
 		backendImage:         "example.com/vllm:typed",
 		runtimeClassName:     "typed-runtime",
 		modelURI:             "/models/typed",
+		modelSourceKind:      vllmModelSourceHostPath,
 		modelHostPath:        "/node/typed",
 		gpuResourceName:      "example.com/typed-gpu",
 		gpuCount:             resource.MustParse("3"),
@@ -107,6 +109,31 @@ func TestResolveVLLMConfigPrefersTypedFields(t *testing.T) {
 		gpuMemoryUtilization: "0.65",
 		enforceEager:         false,
 	})
+}
+
+func TestResolveVLLMConfigPrefersTypedPVCOverLegacyHostPath(t *testing.T) {
+	pu := newTypedVLLMPredictiveUnit(nil)
+	pu.Parameters = []machinelearningv1.Parameter{
+		{Name: "model_host_path", Value: "/node/legacy"},
+	}
+	pu.VLLM.ModelSource = &machinelearningv1.VLLMModelSource{
+		PVC: &machinelearningv1.VLLMPVCSource{ClaimName: "qwen-model"},
+	}
+
+	config, err := resolveVLLMConfig(pu)
+	if err != nil {
+		t.Fatalf("resolveVLLMConfig() error = %v", err)
+	}
+
+	if config.modelSourceKind != vllmModelSourcePVC {
+		t.Fatalf("model source kind = %q, want %q", config.modelSourceKind, vllmModelSourcePVC)
+	}
+	if config.modelPVCClaimName != "qwen-model" {
+		t.Fatalf("PVC claim name = %q, want qwen-model", config.modelPVCClaimName)
+	}
+	if config.modelHostPath != "" {
+		t.Fatalf("host path = %q, want empty when typed PVC is selected", config.modelHostPath)
+	}
 }
 
 func TestAddVLLMServerRendersTypedConfiguration(t *testing.T) {
@@ -156,11 +183,36 @@ func TestAddVLLMServerRendersTypedConfiguration(t *testing.T) {
 	}
 	assertHostPathVolume(t, deploy, constants.VLLMModelVolumeName, "/node/typed")
 	assertVolumeMount(t, backend, constants.VLLMModelVolumeName, "/models/typed")
+	assertReadOnlyVolumeMount(t, backend, constants.VLLMModelVolumeName)
+}
+
+func TestAddVLLMServerRendersReadOnlyPVCModelSource(t *testing.T) {
+	pu := newTypedVLLMPredictiveUnit(nil)
+	pu.VLLM.ModelSource = &machinelearningv1.VLLMModelSource{
+		PVC: &machinelearningv1.VLLMPVCSource{ClaimName: "qwen-model"},
+	}
+	deploy := &appsv1.Deployment{}
+
+	initializer := &PrePackedInitialiser{}
+	if err := initializer.addVLLMServer(&machinelearningv1.SeldonDeployment{}, pu, deploy, testVLLMServerConfig()); err != nil {
+		t.Fatalf("addVLLMServer() error = %v", err)
+	}
+
+	backend := utils.GetContainerForDeployment(deploy, constants.VLLMContainerName)
+	if backend == nil {
+		t.Fatal("vLLM backend container was not generated")
+	}
+	assertPVCVolume(t, deploy, constants.VLLMModelVolumeName, "qwen-model")
+	assertVolumeMount(t, backend, constants.VLLMModelVolumeName, "/models/typed")
+	assertReadOnlyVolumeMount(t, backend, constants.VLLMModelVolumeName)
 }
 
 func TestAddVLLMServerPreservesExplicitComponentSpecFields(t *testing.T) {
 	enforceEager := true
 	pu := newTypedVLLMPredictiveUnit(&enforceEager)
+	pu.VLLM.ModelSource = &machinelearningv1.VLLMModelSource{
+		PVC: &machinelearningv1.VLLMPVCSource{ClaimName: "qwen-model"},
+	}
 	runtimeClassName := "component-runtime"
 	explicitGPUQuantity := resource.MustParse("5")
 	hostPathType := corev1.HostPathDirectory
@@ -270,7 +322,9 @@ func assertResolvedVLLMConfig(t *testing.T, got, want resolvedVLLMConfig) {
 		got.backendImage != want.backendImage ||
 		got.runtimeClassName != want.runtimeClassName ||
 		got.modelURI != want.modelURI ||
+		got.modelSourceKind != want.modelSourceKind ||
 		got.modelHostPath != want.modelHostPath ||
+		got.modelPVCClaimName != want.modelPVCClaimName ||
 		got.gpuResourceName != want.gpuResourceName ||
 		got.backendPort != want.backendPort ||
 		got.maxModelLen != want.maxModelLen ||
@@ -329,12 +383,44 @@ func assertHostPathVolume(t *testing.T, deploy *appsv1.Deployment, name, wantPat
 	t.Fatalf("volume %s was not generated", name)
 }
 
+func assertPVCVolume(t *testing.T, deploy *appsv1.Deployment, name, wantClaimName string) {
+	t.Helper()
+	for _, volume := range deploy.Spec.Template.Spec.Volumes {
+		if volume.Name == name {
+			if volume.PersistentVolumeClaim == nil {
+				t.Fatalf("volume %s = %#v, want PVC source", name, volume.VolumeSource)
+			}
+			if volume.PersistentVolumeClaim.ClaimName != wantClaimName || !volume.PersistentVolumeClaim.ReadOnly {
+				t.Fatalf("PVC volume %s = %#v, want claim %q mounted read-only", name, volume.PersistentVolumeClaim, wantClaimName)
+			}
+			if volume.HostPath != nil {
+				t.Fatalf("PVC volume %s unexpectedly contains hostPath %#v", name, volume.HostPath)
+			}
+			return
+		}
+	}
+	t.Fatalf("volume %s was not generated", name)
+}
+
 func assertVolumeMount(t *testing.T, container *corev1.Container, name, wantPath string) {
 	t.Helper()
 	for _, mount := range container.VolumeMounts {
 		if mount.Name == name {
 			if mount.MountPath != wantPath {
 				t.Fatalf("volume mount %s = %q, want %q", name, mount.MountPath, wantPath)
+			}
+			return
+		}
+	}
+	t.Fatalf("volume mount %s was not generated", name)
+}
+
+func assertReadOnlyVolumeMount(t *testing.T, container *corev1.Container, name string) {
+	t.Helper()
+	for _, mount := range container.VolumeMounts {
+		if mount.Name == name {
+			if !mount.ReadOnly {
+				t.Fatalf("volume mount %s is writable, want read-only", name)
 			}
 			return
 		}

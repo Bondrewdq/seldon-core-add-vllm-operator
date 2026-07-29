@@ -150,6 +150,18 @@ func TestValidateTypedVLLMConfiguration(t *testing.T) {
 	g.Expect(err).ToNot(HaveOccurred())
 }
 
+func TestValidateTypedVLLMPVCConfiguration(t *testing.T) {
+	g := NewGomegaWithT(t)
+	spec := newValidVLLMSeldonDeploymentSpec()
+	spec.Predictors[0].Graph.VLLM.ModelSource = &VLLMModelSource{
+		PVC: &VLLMPVCSource{ClaimName: "qwen05b-model"},
+	}
+
+	err := spec.ValidateSeldonDeployment()
+
+	g.Expect(err).ToNot(HaveOccurred())
+}
+
 func TestValidateTypedVLLMConfigurationErrors(t *testing.T) {
 	tests := []struct {
 		name         string
@@ -193,11 +205,18 @@ func TestValidateTypedVLLMConfigurationErrors(t *testing.T) {
 			expectedPath: "spec.predictors[0].graph.vllm.modelSource",
 		},
 		{
-			name: "missing host path source",
+			name: "missing concrete model source",
 			mutate: func(unit *PredictiveUnit) {
 				unit.VLLM.ModelSource.HostPath = nil
 			},
-			expectedPath: "spec.predictors[0].graph.vllm.modelSource.hostPath",
+			expectedPath: "spec.predictors[0].graph.vllm.modelSource",
+		},
+		{
+			name: "multiple model sources",
+			mutate: func(unit *PredictiveUnit) {
+				unit.VLLM.ModelSource.PVC = &VLLMPVCSource{ClaimName: "qwen-model"}
+			},
+			expectedPath: "spec.predictors[0].graph.vllm.modelSource",
 		},
 		{
 			name: "relative host path",
@@ -205,6 +224,27 @@ func TestValidateTypedVLLMConfigurationErrors(t *testing.T) {
 				unit.VLLM.ModelSource.HostPath.Path = "models/qwen"
 			},
 			expectedPath: "spec.predictors[0].graph.vllm.modelSource.hostPath.path",
+		},
+		{
+			name: "blank pvc claim name",
+			mutate: func(unit *PredictiveUnit) {
+				unit.VLLM.ModelSource = &VLLMModelSource{PVC: &VLLMPVCSource{ClaimName: "   "}}
+			},
+			expectedPath: "spec.predictors[0].graph.vllm.modelSource.pvc.claimName",
+		},
+		{
+			name: "pvc claim name with surrounding whitespace",
+			mutate: func(unit *PredictiveUnit) {
+				unit.VLLM.ModelSource = &VLLMModelSource{PVC: &VLLMPVCSource{ClaimName: " qwen-model"}}
+			},
+			expectedPath: "spec.predictors[0].graph.vllm.modelSource.pvc.claimName",
+		},
+		{
+			name: "invalid pvc claim name",
+			mutate: func(unit *PredictiveUnit) {
+				unit.VLLM.ModelSource = &VLLMModelSource{PVC: &VLLMPVCSource{ClaimName: "QWEN_MODEL"}}
+			},
+			expectedPath: "spec.predictors[0].graph.vllm.modelSource.pvc.claimName",
 		},
 		{
 			name: "image containing whitespace",

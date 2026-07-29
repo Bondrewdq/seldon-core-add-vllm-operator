@@ -389,13 +389,22 @@ func getPredictiveUnitInt32Parameter(pu *machinelearningv1.PredictiveUnit, fallb
 	return int32(parsed), nil
 }
 
+type vllmModelSourceKind string
+
+const (
+	vllmModelSourceHostPath vllmModelSourceKind = "hostPath"
+	vllmModelSourcePVC      vllmModelSourceKind = "pvc"
+)
+
 // resolvedVLLMConfig is the single runtime input consumed by the Pod renderer.
 type resolvedVLLMConfig struct {
 	servedModelName      string
 	backendImage         string
 	runtimeClassName     string
 	modelURI             string
+	modelSourceKind      vllmModelSourceKind
 	modelHostPath        string
+	modelPVCClaimName    string
 	gpuResourceName      string
 	gpuCount             resource.Quantity
 	backendPort          int32
@@ -406,17 +415,21 @@ type resolvedVLLMConfig struct {
 }
 
 func resolveVLLMConfig(pu *machinelearningv1.PredictiveUnit) (resolvedVLLMConfig, error) {
+	legacyModelHostPath := getPredictiveUnitParameterValue(pu, "", "model_host_path")
 	config := resolvedVLLMConfig{
 		servedModelName:      getPredictiveUnitParameterValue(pu, constants.VLLMDefaultServedModelName, "served_model_name", "vllm_model"),
 		backendImage:         getPredictiveUnitParameterValue(pu, constants.VLLMDefaultImage, "vllm_image"),
 		runtimeClassName:     getPredictiveUnitParameterValue(pu, constants.VLLMDefaultRuntimeClassName, "runtime_class_name"),
 		modelURI:             pu.ModelURI,
-		modelHostPath:        getPredictiveUnitParameterValue(pu, "", "model_host_path"),
+		modelHostPath:        legacyModelHostPath,
 		gpuResourceName:      getPredictiveUnitParameterValue(pu, constants.VLLMDefaultGPUResourceName, "gpu_resource_name"),
 		maxModelLen:          getPredictiveUnitParameterValue(pu, constants.VLLMDefaultMaxModelLen, "max_model_len"),
 		maxNumSeqs:           getPredictiveUnitParameterValue(pu, constants.VLLMDefaultMaxNumSeqs, "max_num_seqs"),
 		gpuMemoryUtilization: getPredictiveUnitParameterValue(pu, constants.VLLMDefaultGPUMemoryUtilization, "gpu_memory_utilization"),
 		enforceEager:         getPredictiveUnitBoolParameter(pu, constants.VLLMDefaultEnforceEager, "enforce_eager"),
+	}
+	if legacyModelHostPath != "" {
+		config.modelSourceKind = vllmModelSourceHostPath
 	}
 
 	var err error
@@ -440,8 +453,22 @@ func resolveVLLMConfig(pu *machinelearningv1.PredictiveUnit) (resolvedVLLMConfig
 		if pu.VLLM.RuntimeClassName != "" {
 			config.runtimeClassName = pu.VLLM.RuntimeClassName
 		}
-		if pu.VLLM.ModelSource != nil && pu.VLLM.ModelSource.HostPath != nil && pu.VLLM.ModelSource.HostPath.Path != "" {
-			config.modelHostPath = pu.VLLM.ModelSource.HostPath.Path
+		if pu.VLLM.ModelSource != nil {
+			hasHostPath := pu.VLLM.ModelSource.HostPath != nil
+			hasPVC := pu.VLLM.ModelSource.PVC != nil
+			if hasHostPath && hasPVC {
+				return resolvedVLLMConfig{}, fmt.Errorf("vLLM modelSource hostPath and pvc are mutually exclusive")
+			}
+			if hasHostPath && pu.VLLM.ModelSource.HostPath.Path != "" {
+				config.modelSourceKind = vllmModelSourceHostPath
+				config.modelHostPath = pu.VLLM.ModelSource.HostPath.Path
+				config.modelPVCClaimName = ""
+			}
+			if hasPVC && pu.VLLM.ModelSource.PVC.ClaimName != "" {
+				config.modelSourceKind = vllmModelSourcePVC
+				config.modelHostPath = ""
+				config.modelPVCClaimName = pu.VLLM.ModelSource.PVC.ClaimName
+			}
 		}
 		if pu.VLLM.GPU != nil {
 			if pu.VLLM.GPU.ResourceName != "" {
@@ -652,20 +679,31 @@ func setVLLMBackendDefaults(pu *machinelearningv1.PredictiveUnit, deploy *appsv1
 		deploy.Spec.Template.Spec.RuntimeClassName = &config.runtimeClassName
 	}
 
-	if config.modelHostPath != "" {
+	if config.modelSourceKind != "" {
 		if !strings.HasPrefix(config.modelURI, "/") {
-			return fmt.Errorf("vLLM modelUri must be an absolute container path when model_host_path is set")
+			return fmt.Errorf("vLLM modelUri must be an absolute container path when a model source is set")
 		}
-		hostPathType := v1.HostPathDirectory
-		ensureVolume(&deploy.Spec.Template.Spec, v1.Volume{
-			Name: constants.VLLMModelVolumeName,
-			VolumeSource: v1.VolumeSource{
+		modelVolume := v1.Volume{Name: constants.VLLMModelVolumeName}
+		switch config.modelSourceKind {
+		case vllmModelSourceHostPath:
+			hostPathType := v1.HostPathDirectory
+			modelVolume.VolumeSource = v1.VolumeSource{
 				HostPath: &v1.HostPathVolumeSource{
 					Path: config.modelHostPath,
 					Type: &hostPathType,
 				},
-			},
-		})
+			}
+		case vllmModelSourcePVC:
+			modelVolume.VolumeSource = v1.VolumeSource{
+				PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
+					ClaimName: config.modelPVCClaimName,
+					ReadOnly:  true,
+				},
+			}
+		default:
+			return fmt.Errorf("unsupported vLLM model source %q", config.modelSourceKind)
+		}
+		ensureVolume(&deploy.Spec.Template.Spec, modelVolume)
 		ensureVolumeMount(backend, v1.VolumeMount{
 			Name:      constants.VLLMModelVolumeName,
 			MountPath: config.modelURI,

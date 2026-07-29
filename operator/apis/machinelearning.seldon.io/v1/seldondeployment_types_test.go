@@ -207,4 +207,12 @@ func TestVLLMSpecDeepCopy(t *testing.T) {
 	g.Expect(original.VLLM.ModelSource.HostPath.Path).To(Equal("/models/qwen"))
 	g.Expect(original.VLLM.GPU.Count).To(Equal(int32(1)))
 	g.Expect(*original.VLLM.Engine.EnforceEager).To(BeTrue())
+
+	pvcOriginal := &VLLMModelSource{
+		PVC: &VLLMPVCSource{ClaimName: "qwen-model"},
+	}
+	pvcCopy := pvcOriginal.DeepCopy()
+	pvcCopy.PVC.ClaimName = "other-model"
+
+	g.Expect(pvcOriginal.PVC.ClaimName).To(Equal("qwen-model"))
 }

@@ -10985,6 +10985,23 @@ spec:
                                                                                               required:
                                                                                               - path
                                                                                               type: object
+                                                                                            pvc:
+                                                                                              description: VLLMPVCSource
+                                                                                                mounts
+                                                                                                a
+                                                                                                pre-populated
+                                                                                                PersistentVolumeClaim
+                                                                                                from
+                                                                                                the
+                                                                                                workload
+                                                                                                namespace.
+                                                                                              properties:
+                                                                                                claimName:
+                                                                                                  minLength: 1
+                                                                                                  type: string
+                                                                                              required:
+                                                                                              - claimName
+                                                                                              type: object
                                                                                           type: object
                                                                                         runtimeClassName:
                                                                                           description: RuntimeClassName
@@ -11209,6 +11226,23 @@ spec:
                                                                                         required:
                                                                                         - path
                                                                                         type: object
+                                                                                      pvc:
+                                                                                        description: VLLMPVCSource
+                                                                                          mounts
+                                                                                          a
+                                                                                          pre-populated
+                                                                                          PersistentVolumeClaim
+                                                                                          from
+                                                                                          the
+                                                                                          workload
+                                                                                          namespace.
+                                                                                        properties:
+                                                                                          claimName:
+                                                                                            minLength: 1
+                                                                                            type: string
+                                                                                        required:
+                                                                                        - claimName
+                                                                                        type: object
                                                                                     type: object
                                                                                   runtimeClassName:
                                                                                     description: RuntimeClassName
@@ -11426,6 +11460,23 @@ spec:
                                                                                   required:
                                                                                   - path
                                                                                   type: object
+                                                                                pvc:
+                                                                                  description: VLLMPVCSource
+                                                                                    mounts
+                                                                                    a
+                                                                                    pre-populated
+                                                                                    PersistentVolumeClaim
+                                                                                    from
+                                                                                    the
+                                                                                    workload
+                                                                                    namespace.
+                                                                                  properties:
+                                                                                    claimName:
+                                                                                      minLength: 1
+                                                                                      type: string
+                                                                                  required:
+                                                                                  - claimName
+                                                                                  type: object
                                                                               type: object
                                                                             runtimeClassName:
                                                                               description: RuntimeClassName
@@ -11620,6 +11671,22 @@ spec:
                                                                             required:
                                                                             - path
                                                                             type: object
+                                                                          pvc:
+                                                                            description: VLLMPVCSource
+                                                                              mounts
+                                                                              a pre-populated
+                                                                              PersistentVolumeClaim
+                                                                              from
+                                                                              the
+                                                                              workload
+                                                                              namespace.
+                                                                            properties:
+                                                                              claimName:
+                                                                                minLength: 1
+                                                                                type: string
+                                                                            required:
+                                                                            - claimName
+                                                                            type: object
                                                                         type: object
                                                                       runtimeClassName:
                                                                         description: RuntimeClassName
@@ -11790,6 +11857,19 @@ spec:
                                                                       required:
                                                                       - path
                                                                       type: object
+                                                                    pvc:
+                                                                      description: VLLMPVCSource
+                                                                        mounts a pre-populated
+                                                                        PersistentVolumeClaim
+                                                                        from the workload
+                                                                        namespace.
+                                                                      properties:
+                                                                        claimName:
+                                                                          minLength: 1
+                                                                          type: string
+                                                                      required:
+                                                                      - claimName
+                                                                      type: object
                                                                   type: object
                                                                 runtimeClassName:
                                                                   description: RuntimeClassName
@@ -11950,6 +12030,19 @@ spec:
                                                                 required:
                                                                 - path
                                                                 type: object
+                                                              pvc:
+                                                                description: VLLMPVCSource
+                                                                  mounts a pre-populated
+                                                                  PersistentVolumeClaim
+                                                                  from the workload
+                                                                  namespace.
+                                                                properties:
+                                                                  claimName:
+                                                                    minLength: 1
+                                                                    type: string
+                                                                required:
+                                                                - claimName
+                                                                type: object
                                                             type: object
                                                           runtimeClassName:
                                                             description: RuntimeClassName
@@ -12101,6 +12194,18 @@ spec:
                                                           required:
                                                           - path
                                                           type: object
+                                                        pvc:
+                                                          description: VLLMPVCSource
+                                                            mounts a pre-populated
+                                                            PersistentVolumeClaim
+                                                            from the workload namespace.
+                                                          properties:
+                                                            claimName:
+                                                              minLength: 1
+                                                              type: string
+                                                          required:
+                                                          - claimName
+                                                          type: object
                                                       type: object
                                                     runtimeClassName:
                                                       description: RuntimeClassName
@@ -12250,6 +12355,17 @@ spec:
                                                     required:
                                                     - path
                                                     type: object
+                                                  pvc:
+                                                    description: VLLMPVCSource mounts
+                                                      a pre-populated PersistentVolumeClaim
+                                                      from the workload namespace.
+                                                    properties:
+                                                      claimName:
+                                                        minLength: 1
+                                                        type: string
+                                                    required:
+                                                    - claimName
+                                                    type: object
                                                 type: object
                                               runtimeClassName:
                                                 description: RuntimeClassName selects
@@ -12393,6 +12509,17 @@ spec:
                                               required:
                                               - path
                                               type: object
+                                            pvc:
+                                              description: VLLMPVCSource mounts a
+                                                pre-populated PersistentVolumeClaim
+                                                from the workload namespace.
+                                              properties:
+                                                claimName:
+                                                  minLength: 1
+                                                  type: string
+                                              required:
+                                              - claimName
+                                              type: object
                                           type: object
                                         runtimeClassName:
                                           description: RuntimeClassName selects the
@@ -12534,6 +12661,17 @@ spec:
                                         required:
                                         - path
                                         type: object
+                                      pvc:
+                                        description: VLLMPVCSource mounts a pre-populated
+                                          PersistentVolumeClaim from the workload
+                                          namespace.
+                                        properties:
+                                          claimName:
+                                            minLength: 1
+                                            type: string
+                                        required:
+                                        - claimName
+                                        type: object
                                     type: object
                                   runtimeClassName:
                                     description: RuntimeClassName selects the Kubernetes
@@ -12671,6 +12809,16 @@ spec:
                                       type: string
                                   required:
                                   - path
+                                  type: object
+                                pvc:
+                                  description: VLLMPVCSource mounts a pre-populated
+                                    PersistentVolumeClaim from the workload namespace.
+                                  properties:
+                                    claimName:
+                                      minLength: 1
+                                      type: string
+                                  required:
+                                  - claimName
                                   type: object
                               type: object
                             runtimeClassName:
@@ -23950,6 +24098,23 @@ spec:
                                                                                               required:
                                                                                               - path
                                                                                               type: object
+                                                                                            pvc:
+                                                                                              description: VLLMPVCSource
+                                                                                                mounts
+                                                                                                a
+                                                                                                pre-populated
+                                                                                                PersistentVolumeClaim
+                                                                                                from
+                                                                                                the
+                                                                                                workload
+                                                                                                namespace.
+                                                                                              properties:
+                                                                                                claimName:
+                                                                                                  minLength: 1
+                                                                                                  type: string
+                                                                                              required:
+                                                                                              - claimName
+                                                                                              type: object
                                                                                           type: object
                                                                                         runtimeClassName:
                                                                                           description: RuntimeClassName
@@ -24174,6 +24339,23 @@ spec:
                                                                                         required:
                                                                                         - path
                                                                                         type: object
+                                                                                      pvc:
+                                                                                        description: VLLMPVCSource
+                                                                                          mounts
+                                                                                          a
+                                                                                          pre-populated
+                                                                                          PersistentVolumeClaim
+                                                                                          from
+                                                                                          the
+                                                                                          workload
+                                                                                          namespace.
+                                                                                        properties:
+                                                                                          claimName:
+                                                                                            minLength: 1
+                                                                                            type: string
+                                                                                        required:
+                                                                                        - claimName
+                                                                                        type: object
                                                                                     type: object
                                                                                   runtimeClassName:
                                                                                     description: RuntimeClassName
@@ -24391,6 +24573,23 @@ spec:
                                                                                   required:
                                                                                   - path
                                                                                   type: object
+                                                                                pvc:
+                                                                                  description: VLLMPVCSource
+                                                                                    mounts
+                                                                                    a
+                                                                                    pre-populated
+                                                                                    PersistentVolumeClaim
+                                                                                    from
+                                                                                    the
+                                                                                    workload
+                                                                                    namespace.
+                                                                                  properties:
+                                                                                    claimName:
+                                                                                      minLength: 1
+                                                                                      type: string
+                                                                                  required:
+                                                                                  - claimName
+                                                                                  type: object
                                                                               type: object
                                                                             runtimeClassName:
                                                                               description: RuntimeClassName
@@ -24585,6 +24784,22 @@ spec:
                                                                             required:
                                                                             - path
                                                                             type: object
+                                                                          pvc:
+                                                                            description: VLLMPVCSource
+                                                                              mounts
+                                                                              a pre-populated
+                                                                              PersistentVolumeClaim
+                                                                              from
+                                                                              the
+                                                                              workload
+                                                                              namespace.
+                                                                            properties:
+                                                                              claimName:
+                                                                                minLength: 1
+                                                                                type: string
+                                                                            required:
+                                                                            - claimName
+                                                                            type: object
                                                                         type: object
                                                                       runtimeClassName:
                                                                         description: RuntimeClassName
@@ -24755,6 +24970,19 @@ spec:
                                                                       required:
                                                                       - path
                                                                       type: object
+                                                                    pvc:
+                                                                      description: VLLMPVCSource
+                                                                        mounts a pre-populated
+                                                                        PersistentVolumeClaim
+                                                                        from the workload
+                                                                        namespace.
+                                                                      properties:
+                                                                        claimName:
+                                                                          minLength: 1
+                                                                          type: string
+                                                                      required:
+                                                                      - claimName
+                                                                      type: object
                                                                   type: object
                                                                 runtimeClassName:
                                                                   description: RuntimeClassName
@@ -24915,6 +25143,19 @@ spec:
                                                                 required:
                                                                 - path
                                                                 type: object
+                                                              pvc:
+                                                                description: VLLMPVCSource
+                                                                  mounts a pre-populated
+                                                                  PersistentVolumeClaim
+                                                                  from the workload
+                                                                  namespace.
+                                                                properties:
+                                                                  claimName:
+                                                                    minLength: 1
+                                                                    type: string
+                                                                required:
+                                                                - claimName
+                                                                type: object
                                                             type: object
                                                           runtimeClassName:
                                                             description: RuntimeClassName
@@ -25066,6 +25307,18 @@ spec:
                                                           required:
                                                           - path
                                                           type: object
+                                                        pvc:
+                                                          description: VLLMPVCSource
+                                                            mounts a pre-populated
+                                                            PersistentVolumeClaim
+                                                            from the workload namespace.
+                                                          properties:
+                                                            claimName:
+                                                              minLength: 1
+                                                              type: string
+                                                          required:
+                                                          - claimName
+                                                          type: object
                                                       type: object
                                                     runtimeClassName:
                                                       description: RuntimeClassName
@@ -25215,6 +25468,17 @@ spec:
                                                     required:
                                                     - path
                                                     type: object
+                                                  pvc:
+                                                    description: VLLMPVCSource mounts
+                                                      a pre-populated PersistentVolumeClaim
+                                                      from the workload namespace.
+                                                    properties:
+                                                      claimName:
+                                                        minLength: 1
+                                                        type: string
+                                                    required:
+                                                    - claimName
+                                                    type: object
                                                 type: object
                                               runtimeClassName:
                                                 description: RuntimeClassName selects
@@ -25358,6 +25622,17 @@ spec:
                                               required:
                                               - path
                                               type: object
+                                            pvc:
+                                              description: VLLMPVCSource mounts a
+                                                pre-populated PersistentVolumeClaim
+                                                from the workload namespace.
+                                              properties:
+                                                claimName:
+                                                  minLength: 1
+                                                  type: string
+                                              required:
+                                              - claimName
+                                              type: object
                                           type: object
                                         runtimeClassName:
                                           description: RuntimeClassName selects the
@@ -25499,6 +25774,17 @@ spec:
                                         required:
                                         - path
                                         type: object
+                                      pvc:
+                                        description: VLLMPVCSource mounts a pre-populated
+                                          PersistentVolumeClaim from the workload
+                                          namespace.
+                                        properties:
+                                          claimName:
+                                            minLength: 1
+                                            type: string
+                                        required:
+                                        - claimName
+                                        type: object
                                     type: object
                                   runtimeClassName:
                                     description: RuntimeClassName selects the Kubernetes
@@ -25636,6 +25922,16 @@ spec:
                                       type: string
                                   required:
                                   - path
+                                  type: object
+                                pvc:
+                                  description: VLLMPVCSource mounts a pre-populated
+                                    PersistentVolumeClaim from the workload namespace.
+                                  properties:
+                                    claimName:
+                                      minLength: 1
+                                      type: string
+                                  required:
+                                  - claimName
                                   type: object
                               type: object
                             runtimeClassName:
@@ -36915,6 +37211,23 @@ spec:
                                                                                               required:
                                                                                               - path
                                                                                               type: object
+                                                                                            pvc:
+                                                                                              description: VLLMPVCSource
+                                                                                                mounts
+                                                                                                a
+                                                                                                pre-populated
+                                                                                                PersistentVolumeClaim
+                                                                                                from
+                                                                                                the
+                                                                                                workload
+                                                                                                namespace.
+                                                                                              properties:
+                                                                                                claimName:
+                                                                                                  minLength: 1
+                                                                                                  type: string
+                                                                                              required:
+                                                                                              - claimName
+                                                                                              type: object
                                                                                           type: object
                                                                                         runtimeClassName:
                                                                                           description: RuntimeClassName
@@ -37139,6 +37452,23 @@ spec:
                                                                                         required:
                                                                                         - path
                                                                                         type: object
+                                                                                      pvc:
+                                                                                        description: VLLMPVCSource
+                                                                                          mounts
+                                                                                          a
+                                                                                          pre-populated
+                                                                                          PersistentVolumeClaim
+                                                                                          from
+                                                                                          the
+                                                                                          workload
+                                                                                          namespace.
+                                                                                        properties:
+                                                                                          claimName:
+                                                                                            minLength: 1
+                                                                                            type: string
+                                                                                        required:
+                                                                                        - claimName
+                                                                                        type: object
                                                                                     type: object
                                                                                   runtimeClassName:
                                                                                     description: RuntimeClassName
@@ -37356,6 +37686,23 @@ spec:
                                                                                   required:
                                                                                   - path
                                                                                   type: object
+                                                                                pvc:
+                                                                                  description: VLLMPVCSource
+                                                                                    mounts
+                                                                                    a
+                                                                                    pre-populated
+                                                                                    PersistentVolumeClaim
+                                                                                    from
+                                                                                    the
+                                                                                    workload
+                                                                                    namespace.
+                                                                                  properties:
+                                                                                    claimName:
+                                                                                      minLength: 1
+                                                                                      type: string
+                                                                                  required:
+                                                                                  - claimName
+                                                                                  type: object
                                                                               type: object
                                                                             runtimeClassName:
                                                                               description: RuntimeClassName
@@ -37550,6 +37897,22 @@ spec:
                                                                             required:
                                                                             - path
                                                                             type: object
+                                                                          pvc:
+                                                                            description: VLLMPVCSource
+                                                                              mounts
+                                                                              a pre-populated
+                                                                              PersistentVolumeClaim
+                                                                              from
+                                                                              the
+                                                                              workload
+                                                                              namespace.
+                                                                            properties:
+                                                                              claimName:
+                                                                                minLength: 1
+                                                                                type: string
+                                                                            required:
+                                                                            - claimName
+                                                                            type: object
                                                                         type: object
                                                                       runtimeClassName:
                                                                         description: RuntimeClassName
@@ -37720,6 +38083,19 @@ spec:
                                                                       required:
                                                                       - path
                                                                       type: object
+                                                                    pvc:
+                                                                      description: VLLMPVCSource
+                                                                        mounts a pre-populated
+                                                                        PersistentVolumeClaim
+                                                                        from the workload
+                                                                        namespace.
+                                                                      properties:
+                                                                        claimName:
+                                                                          minLength: 1
+                                                                          type: string
+                                                                      required:
+                                                                      - claimName
+                                                                      type: object
                                                                   type: object
                                                                 runtimeClassName:
                                                                   description: RuntimeClassName
@@ -37880,6 +38256,19 @@ spec:
                                                                 required:
                                                                 - path
                                                                 type: object
+                                                              pvc:
+                                                                description: VLLMPVCSource
+                                                                  mounts a pre-populated
+                                                                  PersistentVolumeClaim
+                                                                  from the workload
+                                                                  namespace.
+                                                                properties:
+                                                                  claimName:
+                                                                    minLength: 1
+                                                                    type: string
+                                                                required:
+                                                                - claimName
+                                                                type: object
                                                             type: object
                                                           runtimeClassName:
                                                             description: RuntimeClassName
@@ -38031,6 +38420,18 @@ spec:
                                                           required:
                                                           - path
                                                           type: object
+                                                        pvc:
+                                                          description: VLLMPVCSource
+                                                            mounts a pre-populated
+                                                            PersistentVolumeClaim
+                                                            from the workload namespace.
+                                                          properties:
+                                                            claimName:
+                                                              minLength: 1
+                                                              type: string
+                                                          required:
+                                                          - claimName
+                                                          type: object
                                                       type: object
                                                     runtimeClassName:
                                                       description: RuntimeClassName
@@ -38180,6 +38581,17 @@ spec:
                                                     required:
                                                     - path
                                                     type: object
+                                                  pvc:
+                                                    description: VLLMPVCSource mounts
+                                                      a pre-populated PersistentVolumeClaim
+                                                      from the workload namespace.
+                                                    properties:
+                                                      claimName:
+                                                        minLength: 1
+                                                        type: string
+                                                    required:
+                                                    - claimName
+                                                    type: object
                                                 type: object
                                               runtimeClassName:
                                                 description: RuntimeClassName selects
@@ -38323,6 +38735,17 @@ spec:
                                               required:
                                               - path
                                               type: object
+                                            pvc:
+                                              description: VLLMPVCSource mounts a
+                                                pre-populated PersistentVolumeClaim
+                                                from the workload namespace.
+                                              properties:
+                                                claimName:
+                                                  minLength: 1
+                                                  type: string
+                                              required:
+                                              - claimName
+                                              type: object
                                           type: object
                                         runtimeClassName:
                                           description: RuntimeClassName selects the
@@ -38464,6 +38887,17 @@ spec:
                                         required:
                                         - path
                                         type: object
+                                      pvc:
+                                        description: VLLMPVCSource mounts a pre-populated
+                                          PersistentVolumeClaim from the workload
+                                          namespace.
+                                        properties:
+                                          claimName:
+                                            minLength: 1
+                                            type: string
+                                        required:
+                                        - claimName
+                                        type: object
                                     type: object
                                   runtimeClassName:
                                     description: RuntimeClassName selects the Kubernetes
@@ -38601,6 +39035,16 @@ spec:
                                       type: string
                                   required:
                                   - path
+                                  type: object
+                                pvc:
+                                  description: VLLMPVCSource mounts a pre-populated
+                                    PersistentVolumeClaim from the workload namespace.
+                                  properties:
+                                    claimName:
+                                      minLength: 1
+                                      type: string
+                                  required:
+                                  - claimName
                                   type: object
                               type: object
                             runtimeClassName:

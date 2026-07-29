@@ -615,12 +615,19 @@ type VLLMSpec struct {
 // VLLMModelSource describes where the vLLM backend reads model files from.
 type VLLMModelSource struct {
 	HostPath *VLLMHostPathSource `json:"hostPath,omitempty" protobuf:"bytes,1,opt,name=hostPath"`
+	PVC      *VLLMPVCSource      `json:"pvc,omitempty" protobuf:"bytes,2,opt,name=pvc"`
 }
 
 // VLLMHostPathSource mounts a model directory from the Kubernetes node.
 type VLLMHostPathSource struct {
 	// +kubebuilder:validation:MinLength=1
 	Path string `json:"path" protobuf:"string,1,opt,name=path"`
+}
+
+// VLLMPVCSource mounts a pre-populated PersistentVolumeClaim from the workload namespace.
+type VLLMPVCSource struct {
+	// +kubebuilder:validation:MinLength=1
+	ClaimName string `json:"claimName" protobuf:"string,1,opt,name=claimName"`
 }
 
 // VLLMGPUSpec defines the extended GPU resource requested by the vLLM backend.
