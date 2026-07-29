@@ -19,12 +19,15 @@ package v1
 import (
 	"fmt"
 	"os"
+	"path"
+	"strings"
 
 	"github.com/seldonio/seldon-core/operator/constants"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	k8svalidation "k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -86,8 +89,109 @@ func GetComponentSpecIdxForPredictiveUnit(p *PredictorSpec, name string) int {
 
 // --- Validating
 
+func validateVLLMSpec(pu *PredictiveUnit, fldPath *field.Path, allErrs field.ErrorList) field.ErrorList {
+	if pu.VLLM == nil {
+		return allErrs
+	}
+
+	vllmPath := fldPath.Child("vllm")
+	implementation := ""
+	if pu.Implementation != nil {
+		implementation = string(*pu.Implementation)
+	}
+	if implementation != PrepackVLLMName {
+		allErrs = append(allErrs, field.NotSupported(
+			fldPath.Child("implementation"),
+			implementation,
+			[]string{PrepackVLLMName},
+		))
+	}
+
+	if strings.TrimSpace(pu.VLLM.ServedModelName) == "" {
+		allErrs = append(allErrs, field.Required(
+			vllmPath.Child("servedModelName"),
+			"servedModelName is required for typed VLLM configuration",
+		))
+	}
+
+	if strings.TrimSpace(pu.ModelURI) == "" {
+		allErrs = append(allErrs, field.Required(
+			fldPath.Child("modelUri"),
+			"modelUri is required for typed VLLM configuration",
+		))
+	} else if strings.TrimSpace(pu.ModelURI) != pu.ModelURI || !path.IsAbs(pu.ModelURI) {
+		allErrs = append(allErrs, field.Invalid(
+			fldPath.Child("modelUri"),
+			pu.ModelURI,
+			"must be an absolute container path without surrounding whitespace",
+		))
+	}
+
+	modelSourcePath := vllmPath.Child("modelSource")
+	if pu.VLLM.ModelSource == nil {
+		allErrs = append(allErrs, field.Required(
+			modelSourcePath,
+			"modelSource is required for typed VLLM configuration",
+		))
+	} else if pu.VLLM.ModelSource.HostPath == nil {
+		allErrs = append(allErrs, field.Required(
+			modelSourcePath.Child("hostPath"),
+			"hostPath is the only model source supported in this version",
+		))
+	} else {
+		hostPath := pu.VLLM.ModelSource.HostPath.Path
+		if strings.TrimSpace(hostPath) == "" {
+			allErrs = append(allErrs, field.Required(
+				modelSourcePath.Child("hostPath").Child("path"),
+				"hostPath.path is required",
+			))
+		} else if strings.TrimSpace(hostPath) != hostPath || !path.IsAbs(hostPath) {
+			allErrs = append(allErrs, field.Invalid(
+				modelSourcePath.Child("hostPath").Child("path"),
+				hostPath,
+				"must be an absolute node path without surrounding whitespace",
+			))
+		}
+	}
+
+	if pu.VLLM.Image != "" && strings.ContainsAny(pu.VLLM.Image, " \t\r\n") {
+		allErrs = append(allErrs, field.Invalid(
+			vllmPath.Child("image"),
+			pu.VLLM.Image,
+			"must not contain whitespace",
+		))
+	}
+
+	if pu.VLLM.RuntimeClassName != "" {
+		if messages := k8svalidation.IsDNS1123Subdomain(pu.VLLM.RuntimeClassName); len(messages) > 0 {
+			allErrs = append(allErrs, field.Invalid(
+				vllmPath.Child("runtimeClassName"),
+				pu.VLLM.RuntimeClassName,
+				strings.Join(messages, "; "),
+			))
+		}
+	}
+
+	if pu.VLLM.GPU != nil && pu.VLLM.GPU.ResourceName != "" {
+		resourceName := pu.VLLM.GPU.ResourceName
+		qualifiedNameErrors := k8svalidation.IsQualifiedName(resourceName)
+		parts := strings.SplitN(resourceName, "/", 2)
+		reservedPrefix := len(parts) == 2 && (parts[0] == "kubernetes.io" || strings.HasSuffix(parts[0], ".kubernetes.io"))
+		if len(parts) != 2 || len(qualifiedNameErrors) > 0 || reservedPrefix {
+			allErrs = append(allErrs, field.Invalid(
+				vllmPath.Child("gpu").Child("resourceName"),
+				resourceName,
+				"must be a qualified, non-kubernetes.io extended resource name such as nvidia.com/gpu",
+			))
+		}
+	}
+
+	return allErrs
+}
+
 // Check the predictive units to ensure the graph matches up with defined containers.
 func (r *SeldonDeploymentSpec) checkPredictiveUnits(pu *PredictiveUnit, p *PredictorSpec, fldPath *field.Path, allErrs field.ErrorList) field.ErrorList {
+	allErrs = validateVLLMSpec(pu, fldPath, allErrs)
 
 	if pu.Implementation == nil || *pu.Implementation == UNKNOWN_IMPLEMENTATION {
 
@@ -133,7 +237,7 @@ func (r *SeldonDeploymentSpec) checkPredictiveUnits(pu *PredictiveUnit, p *Predi
 	}
 
 	for i := 0; i < len(pu.Children); i++ {
-		allErrs = r.checkPredictiveUnits(&pu.Children[i], p, fldPath.Index(i), allErrs)
+		allErrs = r.checkPredictiveUnits(&pu.Children[i], p, fldPath.Child("children").Index(i), allErrs)
 	}
 
 	return allErrs

@@ -36,6 +36,49 @@ func GetPort(name string, ports []corev1.ContainerPort) *corev1.ContainerPort {
 
 //----
 
+func defaultVLLMSpec(spec *VLLMSpec) {
+	if spec == nil {
+		return
+	}
+
+	if spec.Image == "" {
+		spec.Image = constants.VLLMDefaultImage
+	}
+	if spec.RuntimeClassName == "" {
+		spec.RuntimeClassName = constants.VLLMDefaultRuntimeClassName
+	}
+
+	if spec.GPU == nil {
+		spec.GPU = &VLLMGPUSpec{}
+	}
+	if spec.GPU.ResourceName == "" {
+		spec.GPU.ResourceName = constants.VLLMDefaultGPUResourceName
+	}
+	if spec.GPU.Count == 0 {
+		spec.GPU.Count = constants.VLLMDefaultGPUCountValue
+	}
+
+	if spec.Engine == nil {
+		spec.Engine = &VLLMEngineSpec{}
+	}
+	if spec.Engine.Port == 0 {
+		spec.Engine.Port = constants.VLLMDefaultHTTPPort
+	}
+	if spec.Engine.MaxModelLen == 0 {
+		spec.Engine.MaxModelLen = constants.VLLMDefaultMaxModelLenValue
+	}
+	if spec.Engine.MaxNumSeqs == 0 {
+		spec.Engine.MaxNumSeqs = constants.VLLMDefaultMaxNumSeqsValue
+	}
+	if spec.Engine.GPUMemoryUtilizationPercent == 0 {
+		spec.Engine.GPUMemoryUtilizationPercent = constants.VLLMDefaultGPUMemoryPercent
+	}
+	if spec.Engine.EnforceEager == nil {
+		enforceEager := constants.VLLMDefaultEnforceEager
+		spec.Engine.EnforceEager = &enforceEager
+	}
+}
+
 func addDefaultsToGraph(pu *PredictiveUnit) {
 	if pu.Type == nil && pu.Methods == nil && pu.Implementation == nil {
 		ty := MODEL
@@ -48,6 +91,7 @@ func addDefaultsToGraph(pu *PredictiveUnit) {
 		ty := MODEL
 		pu.Type = &ty
 	}
+	defaultVLLMSpec(pu.VLLM)
 	for i := 0; i < len(pu.Children); i++ {
 		addDefaultsToGraph(&pu.Children[i])
 	}

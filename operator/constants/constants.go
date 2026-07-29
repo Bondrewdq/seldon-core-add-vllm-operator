@@ -51,10 +51,15 @@ const (
 	VLLMDefaultRuntimeClassName     = "nvidia"
 	VLLMDefaultServedModelName      = "qwen-0.5b"
 	VLLMDefaultMaxModelLen          = "1024"
+	VLLMDefaultMaxModelLenValue     = int32(1024)
 	VLLMDefaultGPUMemoryUtilization = "0.65"
+	VLLMDefaultGPUMemoryPercent     = int32(65)
 	VLLMDefaultMaxNumSeqs           = "1"
+	VLLMDefaultMaxNumSeqsValue      = int32(1)
 	VLLMDefaultGPUResourceName      = "nvidia.com/gpu"
 	VLLMDefaultGPUCount             = "1"
+	VLLMDefaultGPUCountValue        = int32(1)
+	VLLMDefaultEnforceEager         = true
 	VLLMDefaultSharedMemorySize     = "2Gi"
 )
 
