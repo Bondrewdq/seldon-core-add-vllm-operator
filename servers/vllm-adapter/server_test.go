@@ -205,9 +205,30 @@ func TestMetricsEndpointExposesAdapterMetrics(t *testing.T) {
 	}
 }
 
+func TestDedicatedSeldonMetricsEndpointExposesAdapterMetrics(t *testing.T) {
+	server := newTestServer("http://127.0.0.1:1")
+	server.cfg.MetricsPath = "/prometheus"
+	predictReq := httptest.NewRequest(http.MethodPost, "/predict", strings.NewReader(`{"data":{"ndarray":[[1,2,3]]}}`))
+	predictRR := httptest.NewRecorder()
+	server.routes().ServeHTTP(predictRR, predictReq)
+
+	req := httptest.NewRequest(http.MethodGet, "/prometheus", nil)
+	rr := httptest.NewRecorder()
+	server.metricsRoutes().ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected metrics status 200, got %d", rr.Code)
+	}
+	body, _ := io.ReadAll(rr.Body)
+	if !strings.Contains(string(body), "llm_adapter_requests_total") {
+		t.Fatalf("expected adapter metrics, got: %s", string(body))
+	}
+}
+
 func newTestServer(baseURL string) *adapterServer {
 	cfg := Config{
 		AdapterHTTPPort:    9000,
+		MetricsHTTPPort:    6000,
 		VLLMBaseURL:        baseURL,
 		VLLMModel:          "qwen-test",
 		VLLMAPIKind:        apiKindChat,

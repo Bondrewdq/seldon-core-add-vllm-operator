@@ -44,6 +44,8 @@ const (
 const (
 	VLLMContainerName               = "vllm"
 	VLLMHTTPPortName                = "vllm-http"
+	VLLMRuntimeLabelKey             = "seldon.io/runtime"
+	VLLMRuntimeLabelValue           = "vllm"
 	VLLMModelVolumeName             = "vllm-model"
 	VLLMSharedMemoryVolumeName      = "vllm-shm"
 	VLLMDefaultImage                = "vllm/vllm-openai:v0.8.5"

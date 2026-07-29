@@ -173,6 +173,8 @@ var _ = Describe("Create a prepacked vLLM server for Seldon protocol and REST", 
 
 		Expect(depFetched.Spec.Template.Spec.RuntimeClassName).ToNot(BeNil())
 		Expect(*depFetched.Spec.Template.Spec.RuntimeClassName).To(Equal(constants.VLLMDefaultRuntimeClassName))
+		Expect(depFetched.Labels[constants.VLLMRuntimeLabelKey]).To(Equal(constants.VLLMRuntimeLabelValue))
+		Expect(depFetched.Spec.Template.Labels[constants.VLLMRuntimeLabelKey]).To(Equal(constants.VLLMRuntimeLabelValue))
 		Expect(len(depFetched.Spec.Template.Spec.InitContainers)).To(Equal(0))
 		Expect(len(depFetched.Spec.Template.Spec.Containers)).Should(Equal(3))
 

@@ -748,6 +748,14 @@ func (pi *PrePackedInitialiser) addVLLMServer(mlDep *machinelearningv1.SeldonDep
 	if err != nil {
 		return err
 	}
+	if deploy.Labels == nil {
+		deploy.Labels = map[string]string{}
+	}
+	if deploy.Spec.Template.Labels == nil {
+		deploy.Spec.Template.Labels = map[string]string{}
+	}
+	deploy.Labels[constants.VLLMRuntimeLabelKey] = constants.VLLMRuntimeLabelValue
+	deploy.Spec.Template.Labels[constants.VLLMRuntimeLabelKey] = constants.VLLMRuntimeLabelValue
 
 	backend := utils.GetContainerForDeployment(deploy, constants.VLLMContainerName)
 	if backend != nil {

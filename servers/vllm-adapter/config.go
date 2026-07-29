@@ -16,6 +16,7 @@ const (
 
 type Config struct {
 	AdapterHTTPPort    int
+	MetricsHTTPPort    int
 	VLLMBaseURL        string
 	VLLMModel          string
 	VLLMAPIKind        string
@@ -35,6 +36,7 @@ type Config struct {
 func loadConfigFromEnv() (Config, error) {
 	cfg := Config{
 		AdapterHTTPPort:    getEnvInt("ADAPTER_HTTP_PORT", 9000),
+		MetricsHTTPPort:    getEnvInt("PREDICTIVE_UNIT_METRICS_SERVICE_PORT", getEnvInt("METRICS_HTTP_PORT", 6000)),
 		VLLMBaseURL:        strings.TrimRight(getEnvString("VLLM_BASE_URL", "http://localhost:8000"), "/"),
 		VLLMModel:          getEnvString("VLLM_MODEL", ""),
 		VLLMAPIKind:        strings.ToLower(getEnvString("VLLM_API_KIND", apiKindChat)),
@@ -42,7 +44,7 @@ func loadConfigFromEnv() (Config, error) {
 		RequestTimeout:     time.Duration(getEnvInt("REQUEST_TIMEOUT_MS", 60000)) * time.Millisecond,
 		DefaultMaxTokens:   getEnvInt("DEFAULT_MAX_TOKENS", 256),
 		DefaultTemperature: getEnvFloat("DEFAULT_TEMPERATURE", 0.7),
-		MetricsPath:        getEnvString("METRICS_PATH", "/metrics"),
+		MetricsPath:        firstNonEmpty(os.Getenv("PREDICTIVE_UNIT_METRICS_ENDPOINT"), os.Getenv("METRICS_PATH"), "/prometheus"),
 		LogLevel:           getEnvString("LOG_LEVEL", "info"),
 		Namespace:          firstNonEmpty(os.Getenv("POD_NAMESPACE"), os.Getenv("NAMESPACE"), "unknown"),
 		SeldonDeployment:   firstNonEmpty(os.Getenv("SELDON_DEPLOYMENT_ID"), "unknown"),
@@ -59,6 +61,12 @@ func loadConfigFromEnv() (Config, error) {
 func (c Config) Validate() error {
 	if c.AdapterHTTPPort <= 0 || c.AdapterHTTPPort > 65535 {
 		return fmt.Errorf("ADAPTER_HTTP_PORT must be a valid TCP port")
+	}
+	if c.MetricsHTTPPort <= 0 || c.MetricsHTTPPort > 65535 {
+		return fmt.Errorf("PREDICTIVE_UNIT_METRICS_SERVICE_PORT must be a valid TCP port")
+	}
+	if c.MetricsHTTPPort == c.AdapterHTTPPort {
+		return fmt.Errorf("metrics and adapter HTTP ports must be different")
 	}
 	if c.VLLMBaseURL == "" {
 		return fmt.Errorf("VLLM_BASE_URL must not be empty")

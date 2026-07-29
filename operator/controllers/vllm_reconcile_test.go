@@ -151,6 +151,12 @@ func TestAddVLLMServerRendersTypedConfiguration(t *testing.T) {
 	if deploy.Spec.Template.Spec.RuntimeClassName == nil || *deploy.Spec.Template.Spec.RuntimeClassName != "typed-runtime" {
 		t.Fatalf("runtimeClassName = %v, want typed-runtime", deploy.Spec.Template.Spec.RuntimeClassName)
 	}
+	if deploy.Labels[constants.VLLMRuntimeLabelKey] != constants.VLLMRuntimeLabelValue {
+		t.Fatalf("deployment runtime label = %q, want %q", deploy.Labels[constants.VLLMRuntimeLabelKey], constants.VLLMRuntimeLabelValue)
+	}
+	if deploy.Spec.Template.Labels[constants.VLLMRuntimeLabelKey] != constants.VLLMRuntimeLabelValue {
+		t.Fatalf("pod runtime label = %q, want %q", deploy.Spec.Template.Labels[constants.VLLMRuntimeLabelKey], constants.VLLMRuntimeLabelValue)
+	}
 
 	adapter := utils.GetContainerForDeployment(deploy, pu.Name)
 	if adapter == nil {

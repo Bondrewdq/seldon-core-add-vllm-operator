@@ -40,6 +40,16 @@ func (s *adapterServer) routes() http.Handler {
 	mux.HandleFunc("/ready", s.handleReady)
 	mux.HandleFunc("/health", s.handleReady)
 	mux.HandleFunc("/health/status", s.handleReady)
+	metricsHandler := promhttp.HandlerFor(s.metrics.registry, promhttp.HandlerOpts{})
+	mux.Handle("/metrics", metricsHandler)
+	if s.cfg.MetricsPath != "/metrics" {
+		mux.Handle(s.cfg.MetricsPath, metricsHandler)
+	}
+	return mux
+}
+
+func (s *adapterServer) metricsRoutes() http.Handler {
+	mux := http.NewServeMux()
 	mux.Handle(s.cfg.MetricsPath, promhttp.HandlerFor(s.metrics.registry, promhttp.HandlerOpts{}))
 	return mux
 }
