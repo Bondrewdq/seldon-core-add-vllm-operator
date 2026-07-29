@@ -389,6 +389,92 @@ func getPredictiveUnitInt32Parameter(pu *machinelearningv1.PredictiveUnit, fallb
 	return int32(parsed), nil
 }
 
+// resolvedVLLMConfig is the single runtime input consumed by the Pod renderer.
+type resolvedVLLMConfig struct {
+	servedModelName      string
+	backendImage         string
+	runtimeClassName     string
+	modelURI             string
+	modelHostPath        string
+	gpuResourceName      string
+	gpuCount             resource.Quantity
+	backendPort          int32
+	maxModelLen          string
+	maxNumSeqs           string
+	gpuMemoryUtilization string
+	enforceEager         bool
+}
+
+func resolveVLLMConfig(pu *machinelearningv1.PredictiveUnit) (resolvedVLLMConfig, error) {
+	config := resolvedVLLMConfig{
+		servedModelName:      getPredictiveUnitParameterValue(pu, constants.VLLMDefaultServedModelName, "served_model_name", "vllm_model"),
+		backendImage:         getPredictiveUnitParameterValue(pu, constants.VLLMDefaultImage, "vllm_image"),
+		runtimeClassName:     getPredictiveUnitParameterValue(pu, constants.VLLMDefaultRuntimeClassName, "runtime_class_name"),
+		modelURI:             pu.ModelURI,
+		modelHostPath:        getPredictiveUnitParameterValue(pu, "", "model_host_path"),
+		gpuResourceName:      getPredictiveUnitParameterValue(pu, constants.VLLMDefaultGPUResourceName, "gpu_resource_name"),
+		maxModelLen:          getPredictiveUnitParameterValue(pu, constants.VLLMDefaultMaxModelLen, "max_model_len"),
+		maxNumSeqs:           getPredictiveUnitParameterValue(pu, constants.VLLMDefaultMaxNumSeqs, "max_num_seqs"),
+		gpuMemoryUtilization: getPredictiveUnitParameterValue(pu, constants.VLLMDefaultGPUMemoryUtilization, "gpu_memory_utilization"),
+		enforceEager:         getPredictiveUnitBoolParameter(pu, constants.VLLMDefaultEnforceEager, "enforce_eager"),
+	}
+
+	var err error
+	if pu.VLLM != nil && pu.VLLM.Engine != nil && pu.VLLM.Engine.Port > 0 {
+		config.backendPort = pu.VLLM.Engine.Port
+	} else {
+		config.backendPort, err = getPredictiveUnitInt32Parameter(pu, constants.VLLMDefaultHTTPPort, "vllm_port", "vllm_backend_port")
+		if err != nil {
+			return resolvedVLLMConfig{}, err
+		}
+	}
+
+	gpuCount := getPredictiveUnitParameterValue(pu, constants.VLLMDefaultGPUCount, "gpu_count")
+	if pu.VLLM != nil {
+		if pu.VLLM.ServedModelName != "" {
+			config.servedModelName = pu.VLLM.ServedModelName
+		}
+		if pu.VLLM.Image != "" {
+			config.backendImage = pu.VLLM.Image
+		}
+		if pu.VLLM.RuntimeClassName != "" {
+			config.runtimeClassName = pu.VLLM.RuntimeClassName
+		}
+		if pu.VLLM.ModelSource != nil && pu.VLLM.ModelSource.HostPath != nil && pu.VLLM.ModelSource.HostPath.Path != "" {
+			config.modelHostPath = pu.VLLM.ModelSource.HostPath.Path
+		}
+		if pu.VLLM.GPU != nil {
+			if pu.VLLM.GPU.ResourceName != "" {
+				config.gpuResourceName = pu.VLLM.GPU.ResourceName
+			}
+			if pu.VLLM.GPU.Count > 0 {
+				gpuCount = strconv.FormatInt(int64(pu.VLLM.GPU.Count), 10)
+			}
+		}
+		if pu.VLLM.Engine != nil {
+			if pu.VLLM.Engine.MaxModelLen > 0 {
+				config.maxModelLen = strconv.FormatInt(int64(pu.VLLM.Engine.MaxModelLen), 10)
+			}
+			if pu.VLLM.Engine.MaxNumSeqs > 0 {
+				config.maxNumSeqs = strconv.FormatInt(int64(pu.VLLM.Engine.MaxNumSeqs), 10)
+			}
+			if pu.VLLM.Engine.GPUMemoryUtilizationPercent > 0 {
+				config.gpuMemoryUtilization = strconv.FormatFloat(float64(pu.VLLM.Engine.GPUMemoryUtilizationPercent)/100, 'f', -1, 64)
+			}
+			if pu.VLLM.Engine.EnforceEager != nil {
+				config.enforceEager = *pu.VLLM.Engine.EnforceEager
+			}
+		}
+	}
+
+	config.gpuCount, err = resource.ParseQuantity(gpuCount)
+	if err != nil {
+		return resolvedVLLMConfig{}, fmt.Errorf("failed to parse vLLM gpu_count %q: %w", gpuCount, err)
+	}
+
+	return config, nil
+}
+
 func addEnvVarIfMissing(c *v1.Container, envVar v1.EnvVar) {
 	if !utils.HasEnvVar(c.Env, envVar.Name) {
 		c.Env = append(c.Env, envVar)
@@ -454,7 +540,7 @@ func setVLLMProbeDefaults(c *v1.Container) {
 	}
 }
 
-func setVLLMAdapterDefaults(mlDep *machinelearningv1.SeldonDeployment, p *machinelearningv1.PredictorSpec, pu *machinelearningv1.PredictiveUnit, adapter *v1.Container, serverConfig *machinelearningv1.PredictorServerConfig, backendPort int32, servedModelName string) {
+func setVLLMAdapterDefaults(mlDep *machinelearningv1.SeldonDeployment, pu *machinelearningv1.PredictiveUnit, adapter *v1.Container, serverConfig *machinelearningv1.PredictorServerConfig, config resolvedVLLMConfig) {
 	if adapter.Image == "" {
 		adapter.Image = serverConfig.PrepackImageName(mlDep.Spec.Protocol, pu)
 	}
@@ -495,8 +581,8 @@ func setVLLMAdapterDefaults(mlDep *machinelearningv1.SeldonDeployment, p *machin
 	}
 
 	addEnvVarIfMissing(adapter, v1.EnvVar{Name: "ADAPTER_HTTP_PORT", Value: strconv.Itoa(int(adapterPort))})
-	addEnvVarIfMissing(adapter, v1.EnvVar{Name: "VLLM_BASE_URL", Value: "http://127.0.0.1:" + strconv.Itoa(int(backendPort))})
-	addEnvVarIfMissing(adapter, v1.EnvVar{Name: "VLLM_MODEL", Value: servedModelName})
+	addEnvVarIfMissing(adapter, v1.EnvVar{Name: "VLLM_BASE_URL", Value: "http://127.0.0.1:" + strconv.Itoa(int(config.backendPort))})
+	addEnvVarIfMissing(adapter, v1.EnvVar{Name: "VLLM_MODEL", Value: config.servedModelName})
 	addEnvVarIfMissing(adapter, v1.EnvVar{Name: "VLLM_API_KIND", Value: getPredictiveUnitParameterValue(pu, "chat", "vllm_api_kind", "openai_api_kind")})
 	addEnvVarIfMissing(adapter, v1.EnvVar{Name: "DEFAULT_MAX_TOKENS", Value: getPredictiveUnitParameterValue(pu, "64", "default_max_tokens")})
 	addEnvVarIfMissing(adapter, v1.EnvVar{Name: "REQUEST_TIMEOUT_MS", Value: getPredictiveUnitParameterValue(pu, "60000", "request_timeout_ms")})
@@ -514,48 +600,42 @@ func setVLLMAdapterDefaults(mlDep *machinelearningv1.SeldonDeployment, p *machin
 	}
 }
 
-func setVLLMBackendDefaults(pu *machinelearningv1.PredictiveUnit, deploy *appsv1.Deployment, backend *v1.Container, backendPort int32, servedModelName string) error {
+func setVLLMBackendDefaults(pu *machinelearningv1.PredictiveUnit, deploy *appsv1.Deployment, backend *v1.Container, config resolvedVLLMConfig) error {
 	if backend.Image == "" {
-		backend.Image = getPredictiveUnitParameterValue(pu, constants.VLLMDefaultImage, "vllm_image")
+		backend.Image = config.backendImage
 	}
 	if backend.ImagePullPolicy == "" {
 		backend.ImagePullPolicy = v1.PullIfNotPresent
 	}
-	ensureContainerPort(backend, constants.VLLMHTTPPortName, backendPort)
+	ensureContainerPort(backend, constants.VLLMHTTPPortName, config.backendPort)
 
 	if len(backend.Args) == 0 {
 		backend.Args = []string{
 			"--model",
-			pu.ModelURI,
+			config.modelURI,
 			"--served-model-name",
-			servedModelName,
+			config.servedModelName,
 			"--host",
 			"0.0.0.0",
 			"--port",
-			strconv.Itoa(int(backendPort)),
+			strconv.Itoa(int(config.backendPort)),
 			"--max-model-len",
-			getPredictiveUnitParameterValue(pu, constants.VLLMDefaultMaxModelLen, "max_model_len"),
+			config.maxModelLen,
 			"--gpu-memory-utilization",
-			getPredictiveUnitParameterValue(pu, constants.VLLMDefaultGPUMemoryUtilization, "gpu_memory_utilization"),
+			config.gpuMemoryUtilization,
 			"--max-num-seqs",
-			getPredictiveUnitParameterValue(pu, constants.VLLMDefaultMaxNumSeqs, "max_num_seqs"),
+			config.maxNumSeqs,
 		}
-		if getPredictiveUnitBoolParameter(pu, true, "enforce_eager") {
+		if config.enforceEager {
 			backend.Args = append(backend.Args, "--enforce-eager")
 		}
 	}
 
-	gpuResourceName := getPredictiveUnitParameterValue(pu, constants.VLLMDefaultGPUResourceName, "gpu_resource_name")
-	gpuCount := getPredictiveUnitParameterValue(pu, constants.VLLMDefaultGPUCount, "gpu_count")
-	gpuQuantity, err := resource.ParseQuantity(gpuCount)
-	if err != nil {
-		return fmt.Errorf("failed to parse vLLM gpu_count %q: %w", gpuCount, err)
-	}
 	if backend.Resources.Limits == nil {
 		backend.Resources.Limits = v1.ResourceList{}
 	}
-	if _, ok := backend.Resources.Limits[v1.ResourceName(gpuResourceName)]; !ok {
-		backend.Resources.Limits[v1.ResourceName(gpuResourceName)] = gpuQuantity
+	if _, ok := backend.Resources.Limits[v1.ResourceName(config.gpuResourceName)]; !ok {
+		backend.Resources.Limits[v1.ResourceName(config.gpuResourceName)] = config.gpuCount
 	}
 
 	rootUser := int64(0)
@@ -568,14 +648,12 @@ func setVLLMBackendDefaults(pu *machinelearningv1.PredictiveUnit, deploy *appsv1
 
 	setVLLMProbeDefaults(backend)
 
-	runtimeClassName := getPredictiveUnitParameterValue(pu, constants.VLLMDefaultRuntimeClassName, "runtime_class_name")
-	if deploy.Spec.Template.Spec.RuntimeClassName == nil && runtimeClassName != "" {
-		deploy.Spec.Template.Spec.RuntimeClassName = &runtimeClassName
+	if deploy.Spec.Template.Spec.RuntimeClassName == nil && config.runtimeClassName != "" {
+		deploy.Spec.Template.Spec.RuntimeClassName = &config.runtimeClassName
 	}
 
-	modelHostPath := getPredictiveUnitParameterValue(pu, "", "model_host_path")
-	if modelHostPath != "" {
-		if !strings.HasPrefix(pu.ModelURI, "/") {
+	if config.modelHostPath != "" {
+		if !strings.HasPrefix(config.modelURI, "/") {
 			return fmt.Errorf("vLLM modelUri must be an absolute container path when model_host_path is set")
 		}
 		hostPathType := v1.HostPathDirectory
@@ -583,14 +661,14 @@ func setVLLMBackendDefaults(pu *machinelearningv1.PredictiveUnit, deploy *appsv1
 			Name: constants.VLLMModelVolumeName,
 			VolumeSource: v1.VolumeSource{
 				HostPath: &v1.HostPathVolumeSource{
-					Path: modelHostPath,
+					Path: config.modelHostPath,
 					Type: &hostPathType,
 				},
 			},
 		})
 		ensureVolumeMount(backend, v1.VolumeMount{
 			Name:      constants.VLLMModelVolumeName,
-			MountPath: pu.ModelURI,
+			MountPath: config.modelURI,
 			ReadOnly:  true,
 		})
 	}
@@ -617,7 +695,7 @@ func setVLLMBackendDefaults(pu *machinelearningv1.PredictiveUnit, deploy *appsv1
 	return nil
 }
 
-func (pi *PrePackedInitialiser) addVLLMServer(mlDep *machinelearningv1.SeldonDeployment, p *machinelearningv1.PredictorSpec, pu *machinelearningv1.PredictiveUnit, deploy *appsv1.Deployment, serverConfig *machinelearningv1.PredictorServerConfig) error {
+func (pi *PrePackedInitialiser) addVLLMServer(mlDep *machinelearningv1.SeldonDeployment, pu *machinelearningv1.PredictiveUnit, deploy *appsv1.Deployment, serverConfig *machinelearningv1.PredictorServerConfig) error {
 	ty := machinelearningv1.MODEL
 	pu.Type = &ty
 
@@ -628,12 +706,17 @@ func (pi *PrePackedInitialiser) addVLLMServer(mlDep *machinelearningv1.SeldonDep
 		return fmt.Errorf("vLLM modelUri must not be empty")
 	}
 
-	backendPort, err := getPredictiveUnitInt32Parameter(pu, constants.VLLMDefaultHTTPPort, "vllm_port", "vllm_backend_port")
+	config, err := resolveVLLMConfig(pu)
 	if err != nil {
 		return err
 	}
 
-	servedModelName := getPredictiveUnitParameterValue(pu, constants.VLLMDefaultServedModelName, "served_model_name", "vllm_model")
+	backend := utils.GetContainerForDeployment(deploy, constants.VLLMContainerName)
+	if backend != nil {
+		if port := machinelearningv1.GetPort(constants.VLLMHTTPPortName, backend.Ports); port != nil && port.ContainerPort > 0 {
+			config.backendPort = port.ContainerPort
+		}
+	}
 
 	adapter := utils.GetContainerForDeployment(deploy, pu.Name)
 	if adapter == nil {
@@ -641,16 +724,15 @@ func (pi *PrePackedInitialiser) addVLLMServer(mlDep *machinelearningv1.SeldonDep
 		deploy.Spec.Template.Spec.Containers = append(deploy.Spec.Template.Spec.Containers, *adapter)
 		adapter = utils.GetContainerForDeployment(deploy, pu.Name)
 	}
-	setVLLMAdapterDefaults(mlDep, p, pu, adapter, serverConfig, backendPort, servedModelName)
+	setVLLMAdapterDefaults(mlDep, pu, adapter, serverConfig, config)
 
-	backend := utils.GetContainerForDeployment(deploy, constants.VLLMContainerName)
 	if backend == nil {
 		backend = &v1.Container{Name: constants.VLLMContainerName}
 		deploy.Spec.Template.Spec.Containers = append(deploy.Spec.Template.Spec.Containers, *backend)
 		backend = utils.GetContainerForDeployment(deploy, constants.VLLMContainerName)
 	}
 
-	return setVLLMBackendDefaults(pu, deploy, backend, backendPort, servedModelName)
+	return setVLLMBackendDefaults(pu, deploy, backend, config)
 }
 
 func SetUriParamsForTFServingProxyContainer(pu *machinelearningv1.PredictiveUnit, c *v1.Container) {
@@ -741,7 +823,7 @@ func (pi *PrePackedInitialiser) createStandaloneModelServers(mlDep *machinelearn
 					return err
 				}
 			case machinelearningv1.PrepackVLLMName:
-				if err := pi.addVLLMServer(mlDep, p, pu, deploy, serverConfig); err != nil {
+				if err := pi.addVLLMServer(mlDep, pu, deploy, serverConfig); err != nil {
 					return err
 				}
 			default:
