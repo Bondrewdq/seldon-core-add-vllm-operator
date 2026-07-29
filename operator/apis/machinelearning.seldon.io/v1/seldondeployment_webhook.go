@@ -107,7 +107,7 @@ func (r *SeldonDeploymentSpec) checkPredictiveUnits(pu *PredictiveUnit, p *Predi
 		c := GetContainerForPredictiveUnit(p, pu.Name)
 
 		//Current non tensorflow serving prepack servers can not handle tensorflow protocol
-		if r.Protocol == ProtocolTensorflow && (*pu.Implementation == PrepackSklearnName || *pu.Implementation == PrepackXGBoostName || *pu.Implementation == PrepackMLFlowName || *pu.Implementation == PrepackHuggingFaceName) {
+		if r.Protocol == ProtocolTensorflow && (*pu.Implementation == PrepackSklearnName || *pu.Implementation == PrepackXGBoostName || *pu.Implementation == PrepackMLFlowName || *pu.Implementation == PrepackHuggingFaceName || *pu.Implementation == PrepackVLLMName) {
 			allErrs = append(allErrs, field.Invalid(fldPath, pu.Name, "Prepackaged server does not handle tensorflow protocol "+string(*pu.Implementation)))
 		}
 

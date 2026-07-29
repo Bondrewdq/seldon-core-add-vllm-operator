@@ -28,6 +28,7 @@ import (
 	"github.com/seldonio/seldon-core/operator/utils"
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/client-go/kubernetes"
 )
@@ -357,6 +358,301 @@ func (pi *PrePackedInitialiser) addModelDefaultServers(mlDepSepc *machinelearnin
 	return nil
 }
 
+func getPredictiveUnitParameterValue(pu *machinelearningv1.PredictiveUnit, fallback string, names ...string) string {
+	for _, param := range pu.Parameters {
+		for _, name := range names {
+			if strings.EqualFold(param.Name, name) && strings.TrimSpace(param.Value) != "" {
+				return strings.TrimSpace(param.Value)
+			}
+		}
+	}
+	return fallback
+}
+
+func getPredictiveUnitBoolParameter(pu *machinelearningv1.PredictiveUnit, fallback bool, names ...string) bool {
+	value := strings.ToLower(getPredictiveUnitParameterValue(pu, "", names...))
+	if value == "" {
+		return fallback
+	}
+	return value == "true" || value == "1" || value == "yes"
+}
+
+func getPredictiveUnitInt32Parameter(pu *machinelearningv1.PredictiveUnit, fallback int32, names ...string) (int32, error) {
+	value := getPredictiveUnitParameterValue(pu, "", names...)
+	if value == "" {
+		return fallback, nil
+	}
+	parsed, err := strconv.Atoi(value)
+	if err != nil {
+		return 0, fmt.Errorf("failed to parse %s as integer: %w", strings.Join(names, "/"), err)
+	}
+	return int32(parsed), nil
+}
+
+func addEnvVarIfMissing(c *v1.Container, envVar v1.EnvVar) {
+	if !utils.HasEnvVar(c.Env, envVar.Name) {
+		c.Env = append(c.Env, envVar)
+	}
+}
+
+func ensureContainerPort(c *v1.Container, name string, port int32) {
+	if machinelearningv1.GetPort(name, c.Ports) == nil {
+		c.Ports = append(c.Ports, v1.ContainerPort{
+			Name:          name,
+			ContainerPort: port,
+			Protocol:      v1.ProtocolTCP,
+		})
+	}
+}
+
+func ensureVolumeMount(c *v1.Container, mount v1.VolumeMount) {
+	for _, existing := range c.VolumeMounts {
+		if existing.Name == mount.Name {
+			return
+		}
+	}
+	c.VolumeMounts = append(c.VolumeMounts, mount)
+}
+
+func ensureVolume(podSpec *v1.PodSpec, volume v1.Volume) {
+	for _, existing := range podSpec.Volumes {
+		if existing.Name == volume.Name {
+			return
+		}
+	}
+	podSpec.Volumes = append(podSpec.Volumes, volume)
+}
+
+func setVLLMProbeDefaults(c *v1.Container) {
+	probeHandler := v1.ProbeHandler{HTTPGet: &v1.HTTPGetAction{
+		Path:   "/health",
+		Port:   intstr.FromString(constants.VLLMHTTPPortName),
+		Scheme: v1.URISchemeHTTP,
+	}}
+
+	if c.StartupProbe == nil {
+		c.StartupProbe = &v1.Probe{
+			ProbeHandler:     probeHandler,
+			PeriodSeconds:    10,
+			FailureThreshold: 90,
+		}
+	}
+	if c.ReadinessProbe == nil {
+		c.ReadinessProbe = &v1.Probe{
+			ProbeHandler:     probeHandler,
+			PeriodSeconds:    10,
+			FailureThreshold: 3,
+		}
+	}
+	if c.LivenessProbe == nil {
+		c.LivenessProbe = &v1.Probe{
+			ProbeHandler:        probeHandler,
+			InitialDelaySeconds: 300,
+			PeriodSeconds:       30,
+			FailureThreshold:    3,
+		}
+	}
+}
+
+func setVLLMAdapterDefaults(mlDep *machinelearningv1.SeldonDeployment, p *machinelearningv1.PredictorSpec, pu *machinelearningv1.PredictiveUnit, adapter *v1.Container, serverConfig *machinelearningv1.PredictorServerConfig, backendPort int32, servedModelName string) {
+	if adapter.Image == "" {
+		adapter.Image = serverConfig.PrepackImageName(mlDep.Spec.Protocol, pu)
+	}
+	if adapter.ImagePullPolicy == "" {
+		adapter.ImagePullPolicy = v1.PullIfNotPresent
+	}
+
+	adapterPort := pu.Endpoint.HttpPort
+	if adapterPort == 0 {
+		adapterPort = constants.FirstHttpPortNumber
+		pu.Endpoint.HttpPort = adapterPort
+		pu.Endpoint.ServicePort = adapterPort
+	}
+	ensureContainerPort(adapter, constants.HttpPortName, adapterPort)
+
+	if adapter.ReadinessProbe == nil {
+		adapter.ReadinessProbe = &v1.Probe{
+			ProbeHandler: v1.ProbeHandler{HTTPGet: &v1.HTTPGetAction{
+				Path:   "/ready",
+				Port:   intstr.FromString(constants.HttpPortName),
+				Scheme: v1.URISchemeHTTP,
+			}},
+			PeriodSeconds:    10,
+			FailureThreshold: 12,
+		}
+	}
+	if adapter.LivenessProbe == nil {
+		adapter.LivenessProbe = &v1.Probe{
+			ProbeHandler: v1.ProbeHandler{HTTPGet: &v1.HTTPGetAction{
+				Path:   "/live",
+				Port:   intstr.FromString(constants.HttpPortName),
+				Scheme: v1.URISchemeHTTP,
+			}},
+			InitialDelaySeconds: 30,
+			PeriodSeconds:       10,
+			FailureThreshold:    3,
+		}
+	}
+
+	addEnvVarIfMissing(adapter, v1.EnvVar{Name: "ADAPTER_HTTP_PORT", Value: strconv.Itoa(int(adapterPort))})
+	addEnvVarIfMissing(adapter, v1.EnvVar{Name: "VLLM_BASE_URL", Value: "http://127.0.0.1:" + strconv.Itoa(int(backendPort))})
+	addEnvVarIfMissing(adapter, v1.EnvVar{Name: "VLLM_MODEL", Value: servedModelName})
+	addEnvVarIfMissing(adapter, v1.EnvVar{Name: "VLLM_API_KIND", Value: getPredictiveUnitParameterValue(pu, "chat", "vllm_api_kind", "openai_api_kind")})
+	addEnvVarIfMissing(adapter, v1.EnvVar{Name: "DEFAULT_MAX_TOKENS", Value: getPredictiveUnitParameterValue(pu, "64", "default_max_tokens")})
+	addEnvVarIfMissing(adapter, v1.EnvVar{Name: "REQUEST_TIMEOUT_MS", Value: getPredictiveUnitParameterValue(pu, "60000", "request_timeout_ms")})
+	addEnvVarIfMissing(adapter, v1.EnvVar{Name: "DEFAULT_TEMPERATURE", Value: getPredictiveUnitParameterValue(pu, "0.2", "default_temperature")})
+	addEnvVarIfMissing(adapter, v1.EnvVar{
+		Name: "POD_NAMESPACE",
+		ValueFrom: &v1.EnvVarSource{FieldRef: &v1.ObjectFieldSelector{
+			FieldPath: "metadata.namespace",
+		}},
+	})
+
+	apiKey := getPredictiveUnitParameterValue(pu, "", "vllm_api_key")
+	if apiKey != "" {
+		addEnvVarIfMissing(adapter, v1.EnvVar{Name: "VLLM_API_KEY", Value: apiKey})
+	}
+}
+
+func setVLLMBackendDefaults(pu *machinelearningv1.PredictiveUnit, deploy *appsv1.Deployment, backend *v1.Container, backendPort int32, servedModelName string) error {
+	if backend.Image == "" {
+		backend.Image = getPredictiveUnitParameterValue(pu, constants.VLLMDefaultImage, "vllm_image")
+	}
+	if backend.ImagePullPolicy == "" {
+		backend.ImagePullPolicy = v1.PullIfNotPresent
+	}
+	ensureContainerPort(backend, constants.VLLMHTTPPortName, backendPort)
+
+	if len(backend.Args) == 0 {
+		backend.Args = []string{
+			"--model",
+			pu.ModelURI,
+			"--served-model-name",
+			servedModelName,
+			"--host",
+			"0.0.0.0",
+			"--port",
+			strconv.Itoa(int(backendPort)),
+			"--max-model-len",
+			getPredictiveUnitParameterValue(pu, constants.VLLMDefaultMaxModelLen, "max_model_len"),
+			"--gpu-memory-utilization",
+			getPredictiveUnitParameterValue(pu, constants.VLLMDefaultGPUMemoryUtilization, "gpu_memory_utilization"),
+			"--max-num-seqs",
+			getPredictiveUnitParameterValue(pu, constants.VLLMDefaultMaxNumSeqs, "max_num_seqs"),
+		}
+		if getPredictiveUnitBoolParameter(pu, true, "enforce_eager") {
+			backend.Args = append(backend.Args, "--enforce-eager")
+		}
+	}
+
+	gpuResourceName := getPredictiveUnitParameterValue(pu, constants.VLLMDefaultGPUResourceName, "gpu_resource_name")
+	gpuCount := getPredictiveUnitParameterValue(pu, constants.VLLMDefaultGPUCount, "gpu_count")
+	gpuQuantity, err := resource.ParseQuantity(gpuCount)
+	if err != nil {
+		return fmt.Errorf("failed to parse vLLM gpu_count %q: %w", gpuCount, err)
+	}
+	if backend.Resources.Limits == nil {
+		backend.Resources.Limits = v1.ResourceList{}
+	}
+	if _, ok := backend.Resources.Limits[v1.ResourceName(gpuResourceName)]; !ok {
+		backend.Resources.Limits[v1.ResourceName(gpuResourceName)] = gpuQuantity
+	}
+
+	rootUser := int64(0)
+	if backend.SecurityContext == nil {
+		backend.SecurityContext = &v1.SecurityContext{}
+	}
+	if backend.SecurityContext.RunAsUser == nil {
+		backend.SecurityContext.RunAsUser = &rootUser
+	}
+
+	setVLLMProbeDefaults(backend)
+
+	runtimeClassName := getPredictiveUnitParameterValue(pu, constants.VLLMDefaultRuntimeClassName, "runtime_class_name")
+	if deploy.Spec.Template.Spec.RuntimeClassName == nil && runtimeClassName != "" {
+		deploy.Spec.Template.Spec.RuntimeClassName = &runtimeClassName
+	}
+
+	modelHostPath := getPredictiveUnitParameterValue(pu, "", "model_host_path")
+	if modelHostPath != "" {
+		if !strings.HasPrefix(pu.ModelURI, "/") {
+			return fmt.Errorf("vLLM modelUri must be an absolute container path when model_host_path is set")
+		}
+		hostPathType := v1.HostPathDirectory
+		ensureVolume(&deploy.Spec.Template.Spec, v1.Volume{
+			Name: constants.VLLMModelVolumeName,
+			VolumeSource: v1.VolumeSource{
+				HostPath: &v1.HostPathVolumeSource{
+					Path: modelHostPath,
+					Type: &hostPathType,
+				},
+			},
+		})
+		ensureVolumeMount(backend, v1.VolumeMount{
+			Name:      constants.VLLMModelVolumeName,
+			MountPath: pu.ModelURI,
+			ReadOnly:  true,
+		})
+	}
+
+	shmSize := getPredictiveUnitParameterValue(pu, constants.VLLMDefaultSharedMemorySize, "shm_size")
+	shmQuantity, err := resource.ParseQuantity(shmSize)
+	if err != nil {
+		return fmt.Errorf("failed to parse vLLM shm_size %q: %w", shmSize, err)
+	}
+	ensureVolume(&deploy.Spec.Template.Spec, v1.Volume{
+		Name: constants.VLLMSharedMemoryVolumeName,
+		VolumeSource: v1.VolumeSource{
+			EmptyDir: &v1.EmptyDirVolumeSource{
+				Medium:    v1.StorageMediumMemory,
+				SizeLimit: &shmQuantity,
+			},
+		},
+	})
+	ensureVolumeMount(backend, v1.VolumeMount{
+		Name:      constants.VLLMSharedMemoryVolumeName,
+		MountPath: "/dev/shm",
+	})
+
+	return nil
+}
+
+func (pi *PrePackedInitialiser) addVLLMServer(mlDep *machinelearningv1.SeldonDeployment, p *machinelearningv1.PredictorSpec, pu *machinelearningv1.PredictiveUnit, deploy *appsv1.Deployment, serverConfig *machinelearningv1.PredictorServerConfig) error {
+	ty := machinelearningv1.MODEL
+	pu.Type = &ty
+
+	if pu.Endpoint == nil {
+		pu.Endpoint = &machinelearningv1.Endpoint{Type: machinelearningv1.REST}
+	}
+	if pu.ModelURI == "" {
+		return fmt.Errorf("vLLM modelUri must not be empty")
+	}
+
+	backendPort, err := getPredictiveUnitInt32Parameter(pu, constants.VLLMDefaultHTTPPort, "vllm_port", "vllm_backend_port")
+	if err != nil {
+		return err
+	}
+
+	servedModelName := getPredictiveUnitParameterValue(pu, constants.VLLMDefaultServedModelName, "served_model_name", "vllm_model")
+
+	adapter := utils.GetContainerForDeployment(deploy, pu.Name)
+	if adapter == nil {
+		adapter = &v1.Container{Name: pu.Name}
+		deploy.Spec.Template.Spec.Containers = append(deploy.Spec.Template.Spec.Containers, *adapter)
+		adapter = utils.GetContainerForDeployment(deploy, pu.Name)
+	}
+	setVLLMAdapterDefaults(mlDep, p, pu, adapter, serverConfig, backendPort, servedModelName)
+
+	backend := utils.GetContainerForDeployment(deploy, constants.VLLMContainerName)
+	if backend == nil {
+		backend = &v1.Container{Name: constants.VLLMContainerName}
+		deploy.Spec.Template.Spec.Containers = append(deploy.Spec.Template.Spec.Containers, *backend)
+		backend = utils.GetContainerForDeployment(deploy, constants.VLLMContainerName)
+	}
+
+	return setVLLMBackendDefaults(pu, deploy, backend, backendPort, servedModelName)
+}
+
 func SetUriParamsForTFServingProxyContainer(pu *machinelearningv1.PredictiveUnit, c *v1.Container) {
 
 	parameters := pu.Parameters
@@ -444,6 +740,10 @@ func (pi *PrePackedInitialiser) createStandaloneModelServers(mlDep *machinelearn
 				if err := pi.addTritonServer(&mlDep.Spec, pu, deploy, serverConfig); err != nil {
 					return err
 				}
+			case machinelearningv1.PrepackVLLMName:
+				if err := pi.addVLLMServer(mlDep, p, pu, deploy, serverConfig); err != nil {
+					return err
+				}
 			default:
 				// If protocol is V2, try to add container with MLServer
 				if mlDep.Spec.Protocol == machinelearningv1.ProtocolKFServing || mlDep.Spec.Protocol == machinelearningv1.ProtocolV2 {
@@ -470,7 +770,9 @@ func (pi *PrePackedInitialiser) createStandaloneModelServers(mlDep *machinelearn
 				//checking for con.Name != "" is a fallback check that we haven't got an empty/nil container as name is required
 				if con.Name != EngineContainerName && con.Name != constants.TFServingContainerName && con.Name != "" {
 					svc := createContainerService(deploy, *p, mlDep, con, *c, seldonId)
-					c.services = append(c.services, svc)
+					if svc != nil {
+						c.services = append(c.services, svc)
+					}
 				}
 			}
 			if len(deploy.Spec.Template.Spec.Containers) > 0 && deploy.Spec.Template.Spec.Containers[0].Name != "" {

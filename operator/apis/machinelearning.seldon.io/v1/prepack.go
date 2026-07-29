@@ -29,6 +29,7 @@ const (
 	PrepackHuggingFaceName = "HUGGINGFACE_SERVER"
 	PrepackTritonName      = "TRITON_SERVER"
 	PrepackTempoName       = "TEMPO_SERVER"
+	PrepackVLLMName        = "VLLM_SERVER"
 )
 
 const PredictorServerConfigMapKeyName = "predictor_servers"

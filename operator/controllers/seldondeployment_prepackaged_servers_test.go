@@ -93,6 +93,145 @@ var _ = Describe("Create a prepacked sklearn server.", func() {
 
 })
 
+var _ = Describe("Create a prepacked vLLM server for Seldon protocol and REST", func() {
+	const interval = time.Second * 1
+	const name = "vllm-prepack"
+	const sdepName = "vllm-prepack"
+
+	It("should create an adapter container and a vLLM GPU backend container", func() {
+		Expect(k8sClient).NotTo(BeNil())
+		var modelType = machinelearningv1.MODEL
+		var impl = machinelearningv1.PredictiveUnitImplementation(constants.PrePackedServerVllm)
+		modelName := "llm-adapter"
+		key := types.NamespacedName{
+			Name:      sdepName,
+			Namespace: "default",
+		}
+		instance := &machinelearningv1.SeldonDeployment{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      key.Name,
+				Namespace: key.Namespace,
+			},
+			Spec: machinelearningv1.SeldonDeploymentSpec{
+				Name: name,
+				Predictors: []machinelearningv1.PredictorSpec{
+					{
+						Name: "default",
+						Graph: machinelearningv1.PredictiveUnit{
+							Name:           modelName,
+							ModelURI:       "/models/qwen",
+							Type:           &modelType,
+							Implementation: &impl,
+							Endpoint:       &machinelearningv1.Endpoint{Type: machinelearningv1.REST},
+							Parameters: []machinelearningv1.Parameter{
+								{
+									Name:  "model_host_path",
+									Type:  machinelearningv1.STRING,
+									Value: "/home/bondrewd/models/Qwen2.5-0.5B-Instruct",
+								},
+								{
+									Name:  "served_model_name",
+									Type:  machinelearningv1.STRING,
+									Value: "qwen-0.5b",
+								},
+							},
+						},
+					},
+				},
+			},
+		}
+
+		configMapName := types.NamespacedName{Name: "seldon-config",
+			Namespace: "seldon-system"}
+
+		configResult := &corev1.ConfigMap{}
+		const timeout = time.Second * 30
+		Eventually(func() error { return k8sClient.Get(context.TODO(), configMapName, configResult) }, timeout).
+			Should(Succeed())
+
+		instance.Default()
+
+		Expect(k8sClient.Create(context.Background(), instance)).Should(Succeed())
+
+		fetched := &machinelearningv1.SeldonDeployment{}
+		Eventually(func() error {
+			return k8sClient.Get(context.Background(), key, fetched)
+		}, timeout, interval).Should(BeNil())
+		Expect(fetched.Name).Should(Equal(sdepName))
+
+		predictor := instance.Spec.Predictors[0]
+		sPodSpec, idx := utils.GetSeldonPodSpecForPredictiveUnit(&predictor, predictor.Graph.Name)
+		depName := machinelearningv1.GetDeploymentName(instance, predictor, sPodSpec, idx)
+		depKey := types.NamespacedName{
+			Name:      depName,
+			Namespace: "default",
+		}
+		depFetched := &appsv1.Deployment{}
+		Eventually(func() error {
+			return k8sClient.Get(context.Background(), depKey, depFetched)
+		}, timeout, interval).Should(BeNil())
+
+		Expect(depFetched.Spec.Template.Spec.RuntimeClassName).ToNot(BeNil())
+		Expect(*depFetched.Spec.Template.Spec.RuntimeClassName).To(Equal(constants.VLLMDefaultRuntimeClassName))
+		Expect(len(depFetched.Spec.Template.Spec.InitContainers)).To(Equal(0))
+		Expect(len(depFetched.Spec.Template.Spec.Containers)).Should(Equal(3))
+
+		adapter := utils.GetContainerForDeployment(depFetched, modelName)
+		Expect(adapter).ToNot(BeNil())
+		Expect(adapter.Image).To(Equal("localhost/seldon-vllm-adapter:dev"))
+		Expect(adapter.ReadinessProbe).ToNot(BeNil())
+		Expect(adapter.LivenessProbe).ToNot(BeNil())
+
+		envValue := func(container *corev1.Container, name string) string {
+			for _, env := range container.Env {
+				if env.Name == name {
+					return env.Value
+				}
+			}
+			return ""
+		}
+		Expect(envValue(adapter, "VLLM_BASE_URL")).To(Equal("http://127.0.0.1:8081"))
+		Expect(envValue(adapter, "VLLM_MODEL")).To(Equal("qwen-0.5b"))
+		Expect(envValue(adapter, "VLLM_API_KIND")).To(Equal("chat"))
+		Expect(envValue(adapter, "DEFAULT_MAX_TOKENS")).To(Equal("64"))
+
+		backend := utils.GetContainerForDeployment(depFetched, constants.VLLMContainerName)
+		Expect(backend).ToNot(BeNil())
+		Expect(backend.Image).To(Equal(constants.VLLMDefaultImage))
+		Expect(backend.Args).To(ContainElement("--model"))
+		Expect(backend.Args).To(ContainElement("/models/qwen"))
+		Expect(backend.Args).To(ContainElement("--served-model-name"))
+		Expect(backend.Args).To(ContainElement("qwen-0.5b"))
+		Expect(backend.Args).To(ContainElement("--enforce-eager"))
+		Expect(backend.StartupProbe).ToNot(BeNil())
+		Expect(backend.ReadinessProbe).ToNot(BeNil())
+		Expect(backend.LivenessProbe).ToNot(BeNil())
+		Expect(backend.SecurityContext).ToNot(BeNil())
+		Expect(backend.SecurityContext.RunAsUser).ToNot(BeNil())
+		Expect(*backend.SecurityContext.RunAsUser).To(Equal(int64(0)))
+		Expect(backend.Resources.Limits[corev1.ResourceName(constants.VLLMDefaultGPUResourceName)]).To(Equal(resource.MustParse(constants.VLLMDefaultGPUCount)))
+
+		modelVolumeFound := false
+		shmVolumeFound := false
+		for _, volume := range depFetched.Spec.Template.Spec.Volumes {
+			if volume.Name == constants.VLLMModelVolumeName {
+				modelVolumeFound = true
+				Expect(volume.HostPath).ToNot(BeNil())
+				Expect(volume.HostPath.Path).To(Equal("/home/bondrewd/models/Qwen2.5-0.5B-Instruct"))
+			}
+			if volume.Name == constants.VLLMSharedMemoryVolumeName {
+				shmVolumeFound = true
+				Expect(volume.EmptyDir).ToNot(BeNil())
+				Expect(volume.EmptyDir.Medium).To(Equal(corev1.StorageMediumMemory))
+			}
+		}
+		Expect(modelVolumeFound).To(BeTrue())
+		Expect(shmVolumeFound).To(BeTrue())
+
+		Expect(k8sClient.Delete(context.Background(), instance)).Should(Succeed())
+	})
+})
+
 var _ = Describe("Create a prepacked tfserving server for Seldon protocol and REST", func() {
 	const interval = time.Second * 1
 	const name = "pp2"

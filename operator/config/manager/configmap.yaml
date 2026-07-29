@@ -73,33 +73,41 @@ data:
               }
             }
         },
+        "VLLM_SERVER": {
+          "protocols" : {
+            "seldon": {
+              "image": "localhost/seldon-vllm-adapter",
+              "defaultImageVersion": "dev"
+              }
+            }
+        },
         "HUGGINGFACE_SERVER": {
           "protocols" : {
             "v2": {
               "image": "seldonio/mlserver",
-              "defaultImageVersion": "1.3.0-huggingface"
-              }
+            "defaultImageVersion": "1.3.0-huggingface"
             }
-        },
-        "TEMPO_SERVER": {
-          "protocols" : {
-            "v2": {
-              "image": "seldonio/mlserver",
-              "defaultImageVersion": "1.3.0-slim"
-              }
+          }
+      },
+      "TEMPO_SERVER": {
+        "protocols" : {
+          "v2": {
+            "image": "seldonio/mlserver",
+            "defaultImageVersion": "1.3.0-slim"
             }
-        }
+          }
+      }
     }
-  storageInitializer: |-
-    {
-        "image" : "seldonio/rclone-storage-initializer:1.14.1",
-        "memoryRequest": "100Mi",
-        "memoryLimit": "1Gi",
-        "cpuRequest": "100m",
-        "cpuLimit": "1"
-    }
-  explainer: |-
-    {
-        "image" : "seldonio/alibiexplainer:1.16.0",
-        "image_v2" : "seldonio/mlserver:1.3.0-alibi-explain"
-    }
+storageInitializer: |-
+  {
+      "image" : "seldonio/rclone-storage-initializer:1.14.1",
+      "memoryRequest": "100Mi",
+      "memoryLimit": "1Gi",
+      "cpuRequest": "100m",
+      "cpuLimit": "1"
+  }
+explainer: |-
+  {
+      "image" : "seldonio/alibiexplainer:1.16.0",
+      "image_v2" : "seldonio/mlserver:1.3.0-alibi-explain"
+  }

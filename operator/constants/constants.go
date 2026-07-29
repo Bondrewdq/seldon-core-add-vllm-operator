@@ -11,6 +11,7 @@ const (
 	PrePackedServerSklearn    = "SKLEARN_SERVER"
 	PrePackedServerTriton     = "TRITON_SERVER"
 	PrePackedMlflow           = "MLFLOW_SERVER"
+	PrePackedServerVllm       = "VLLM_SERVER"
 
 	TfServingGrpcPort    = 2000
 	TfServingRestPort    = 2001
@@ -38,6 +39,23 @@ const (
 
 	MLServerDefaultGrpcPort = int32(2001)
 	MLServerDefaultHttpPort = int32(2000)
+)
+
+const (
+	VLLMContainerName               = "vllm"
+	VLLMHTTPPortName                = "vllm-http"
+	VLLMModelVolumeName             = "vllm-model"
+	VLLMSharedMemoryVolumeName      = "vllm-shm"
+	VLLMDefaultImage                = "vllm/vllm-openai:v0.8.5"
+	VLLMDefaultHTTPPort             = int32(8081)
+	VLLMDefaultRuntimeClassName     = "nvidia"
+	VLLMDefaultServedModelName      = "qwen-0.5b"
+	VLLMDefaultMaxModelLen          = "1024"
+	VLLMDefaultGPUMemoryUtilization = "0.65"
+	VLLMDefaultMaxNumSeqs           = "1"
+	VLLMDefaultGPUResourceName      = "nvidia.com/gpu"
+	VLLMDefaultGPUCount             = "1"
+	VLLMDefaultSharedMemorySize     = "2Gi"
 )
 
 // Metrics-related constants

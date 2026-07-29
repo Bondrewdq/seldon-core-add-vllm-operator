@@ -156,17 +156,25 @@ var configs = map[string]string{
               }
             }
         },
-        "TRITON_SERVER": {
-          "protocols" : {
-            "kfserving": {
-              "image": "nvcr.io/nvidia/tritonserver",
-              "defaultImageVersion": "21.08-py3"
-              }
-            }
-        },
-        "CUSTOM_SERVER": {
-          "protocols" : {
-            "seldon": {
+	        "TRITON_SERVER": {
+	          "protocols" : {
+	            "kfserving": {
+	              "image": "nvcr.io/nvidia/tritonserver",
+	              "defaultImageVersion": "21.08-py3"
+	              }
+	            }
+	        },
+	        "VLLM_SERVER": {
+	          "protocols" : {
+	            "seldon": {
+	              "image": "localhost/seldon-vllm-adapter",
+	              "defaultImageVersion": "dev"
+	              }
+	            }
+	        },
+	        "CUSTOM_SERVER": {
+	          "protocols" : {
+	            "seldon": {
               "image": "custom",
               "defaultImageVersion": "0.1"
               }
